@@ -6,7 +6,6 @@ Returns tuples of (password, warning_message) so the UI can
 decide how to present warnings to the user.
 """
 
-import random
 from .config import PASSWORD_PATTERNS, DEFAULT_PATTERN
 
 
@@ -28,32 +27,22 @@ def build_password(
         - warning_message (str | None): A warning to show the user, or None if everything was normal.
     """
     
-    # 1. Basic Validation (UI normally enforces this, but we double-check)
+    # 1. Basic Validation
     if not all([prefix, base_number, special_chars, service_name]):
-        return None, "Please fill in all fields."
+        return None, "Please fill in all required fields."
 
     try:
         base_num_int = int(base_number)
     except ValueError:
         return None, "Base number must be an integer."
 
-    # 2. Capitalization Logic
-    warning_msg = None
+    # 2. Capitalization Logic (Updated)
+    # If user_letter is provided, use it. If empty, leave it blank.
     if user_letter:
-        if user_letter.lower() in service_name.lower():
-            # Find letter in service and capitalize it
-            idx = service_name.lower().index(user_letter.lower())
-            capital_letter = service_name[idx].upper()
-        else:
-            # Letter not found in service
-            capital_letter = random.choice(service_name).upper()
-            warning_msg = (
-                f"The letter '{user_letter}' is not in service name '{service_name}'.\n"
-                f"Randomly capitalizing: '{capital_letter}'"
-            )
+        capital_letter = user_letter.upper()
+        middle = f"{len(service_name)}{capital_letter}"
     else:
-        # No letter specified — pick randomly
-        capital_letter = random.choice(service_name).upper()
+        middle = f"{len(service_name)}"
 
     # 3. Quotation Style Selection
     if quotation_style == "single":
@@ -65,7 +54,6 @@ def build_password(
 
     # 4. Build Components
     length = len(service_name)
-    middle = f"{length}{capital_letter}"
     end_number = base_num_int + length
 
     # 5. Apply Pattern
@@ -85,5 +73,10 @@ def build_password(
         final_password = f"{suffix}{base_password}{suffix}"
     else:
         final_password = base_password
+
+    # 7. Security Warning (Check for missing uppercase letters)
+    warning_msg = None
+    if not any(char.isupper() for char in final_password):
+        warning_msg = "Security Warning: Your generated password does not contain any uppercase letters."
 
     return final_password, warning_msg

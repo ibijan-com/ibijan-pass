@@ -5,14 +5,19 @@ Handles:
 - Master password verification for secure profiles
 - File locations viewer
 - Factory Reset (with double confirmation)
+- About dialog
 """
 
 import os
 import subprocess
+import webbrowser
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from .config import CONFIG_DIR, KEY_FILE, MASTER_HASH_FILE, VAULT_FILE, PROFILES_FILE
+from .config import (
+    CONFIG_DIR, KEY_FILE, MASTER_HASH_FILE, VAULT_FILE, 
+    PROFILES_FILE, APP_VERSION, APP_WEBSITE
+)
 from .crypto import verify_master
 from .clipboard import clipboard_manager
 
@@ -27,12 +32,12 @@ def verify_master_password_for_profile(root) -> bool:
     verify_window.resizable(False, False)
 
     tk.Label(verify_window, text="🔒 Master Password Required",
-             font=("Arial", 12, "bold")).pack(pady=10)
+             font=("Helvetica", 12, "bold")).pack(pady=10)
 
     tk.Label(verify_window, text="This secure profile requires additional authentication:",
-             font=("Arial", 9)).pack(pady=5)
+             font=("Helvetica", 9)).pack(pady=5)
 
-    password_entry = tk.Entry(verify_window, show="*", width=25, font=("Arial", 10))
+    password_entry = tk.Entry(verify_window, show="*", width=25, font=("Helvetica", 10))
     password_entry.pack(pady=15)
     password_entry.focus()
 
@@ -51,9 +56,9 @@ def verify_master_password_for_profile(root) -> bool:
     btn_frame.pack(pady=10)
 
     tk.Button(btn_frame, text="Verify", command=check_password,
-              width=10, bg="#22C55E", fg="white").pack(side="left", padx=5)
+              width=10, bg="#00A693", fg="white").pack(side="left", padx=5)
     tk.Button(btn_frame, text="Cancel", command=verify_window.destroy,
-              width=10, bg="#DC2626", fg="white").pack(side="left", padx=5)
+              width=10, bg="#CC3333", fg="white").pack(side="left", padx=5)
 
     password_entry.bind("<Return>", lambda e: check_password())
 
@@ -104,7 +109,7 @@ def show_file_locations(root):
 • Files are encrypted for security
 """
 
-    text_widget = tk.Text(locations_window, wrap="word", padx=15, pady=15, font=("Arial", 10))
+    text_widget = tk.Text(locations_window, wrap="word", padx=15, pady=15, font=("Helvetica", 10))
     scrollbar = ttk.Scrollbar(locations_window, orient="vertical", command=text_widget.yview)
     text_widget.configure(yscrollcommand=scrollbar.set)
 
@@ -126,7 +131,7 @@ def show_file_locations(root):
               bg="#1C39BB", fg="white", width=15).pack(side="left", padx=5)
 
     tk.Button(button_frame, text="Close", command=locations_window.destroy,
-              bg="#DC2626", fg="white", width=10).pack(side="right", padx=5)
+              bg="#CC3333", fg="white", width=10).pack(side="right", padx=5)
 
 
 def factory_reset(root, on_complete_callback=None):
@@ -152,13 +157,14 @@ def factory_reset(root, on_complete_callback=None):
     confirm_window.grab_set()
 
     tk.Label(confirm_window, text="⚠️ FINAL CONFIRMATION REQUIRED",
-             font=("Arial", 12, "bold"), fg="#DC2626").pack(pady=10)
+             font=("Helvetica", 12, "bold"), fg="#CC3333").pack(pady=10)
 
     tk.Label(confirm_window, text="To permanently delete ALL data, please type the following phrase:\n\"DELETE ALL DATA\"",
-             font=("Arial", 10), justify="center").pack(pady=5)
+             font=("Helvetica", 10), justify="center").pack(pady=5)
 
-    confirmation_entry = tk.Entry(confirm_window, width=30, font=("Arial", 10), justify="center")
+    confirmation_entry = tk.Entry(confirm_window, width=30, font=("Helvetica", 10), justify="center")
     confirmation_entry.pack(pady=15)
+    confirmation_entry.focus()
 
     def final_confirmation():
         if confirmation_entry.get() == "DELETE ALL DATA":
@@ -167,11 +173,13 @@ def factory_reset(root, on_complete_callback=None):
         else:
             messagebox.showerror("Error", "The phrase you entered is incorrect!", parent=confirm_window)
 
+    confirmation_entry.bind("<Return>", lambda e: final_confirmation())
+
     button_frame = tk.Frame(confirm_window)
     button_frame.pack(pady=10)
 
     tk.Button(button_frame, text="CONFIRM DELETE", command=final_confirmation,
-              bg="#DC2626", fg="white", font=("Arial", 10, "bold"), width=15).pack(side="left", padx=5)
+              bg="#CC3333", fg="white", font=("Helvetica", 10, "bold"), width=15).pack(side="left", padx=5)
     tk.Button(button_frame, text="CANCEL", command=confirm_window.destroy,
               bg="#6B7280", fg="white", width=10).pack(side="left", padx=5)
 
@@ -202,3 +210,51 @@ def _perform_factory_reset(root, on_complete_callback):
         on_complete_callback()
     else:
         root.destroy()
+
+
+def open_config_folder(root):
+    """Opens the ~/.spg folder in the system file manager."""
+    try:
+        if os.name == 'nt':  # Windows
+            os.startfile(CONFIG_DIR)
+        elif os.uname().sysname == 'Darwin':  # macOS
+            subprocess.run(["open", CONFIG_DIR])
+        else:  # Linux
+            subprocess.run(["xdg-open", CONFIG_DIR])
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not open folder: {e}", parent=root)
+
+
+def show_about_dialog(root):
+    """Show About dialog with links and license info."""
+    about_window = tk.Toplevel(root)
+    about_window.title("About iBijan Pass")
+    about_window.geometry("400x380")
+    about_window.transient(root)
+    about_window.grab_set()
+    about_window.resizable(False, False)
+
+    tk.Label(about_window, text="🔐 iBijan Pass", font=("Helvetica", 18, "bold"), fg="#1C39BB").pack(pady=(20, 5))
+    tk.Label(about_window, text="Smart Password Generator", font=("Helvetica", 11), fg="gray").pack()
+    tk.Label(about_window, text=f"Version: {APP_VERSION}", font=("Helvetica", 9)).pack(pady=(5, 15))
+
+    tk.Label(about_window, text="An offline, encrypted password generator\nwith custom patterns and vault storage.", justify="center").pack()
+
+    link_frame = tk.Frame(about_window)
+    link_frame.pack(pady=15)
+
+    def open_url(url):
+        webbrowser.open_new(url)
+
+    web_link = tk.Label(link_frame, text="🌐 Website: ibijan.com", fg="#1C39BB", cursor="hand2", font=("Helvetica", 10, "underline"))
+    web_link.pack()
+    web_link.bind("<Button-1>", lambda e: open_url(APP_WEBSITE))
+
+    gh_link = tk.Label(link_frame, text="🐙 GitHub: ibijan-com/ibijan-pass", fg="#1C39BB", cursor="hand2", font=("Helvetica", 10, "underline"))
+    gh_link.pack(pady=5)
+    gh_link.bind("<Button-1>", lambda e: open_url("https://github.com/ibijan-com/ibijan-pass"))
+
+    tk.Label(about_window, text="License: MIT", font=("Helvetica", 9), fg="gray").pack(pady=(10, 5))
+    tk.Label(about_window, text="© 2024 IBiJan", font=("Helvetica", 9), fg="gray").pack()
+
+    tk.Button(about_window, text="Close", command=about_window.destroy, bg="#CC3333", fg="white", width=10, font=("Helvetica", 10, "bold")).pack(side="bottom", pady=15)

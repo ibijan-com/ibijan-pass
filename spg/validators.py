@@ -11,7 +11,7 @@ from .config import ALLOWED_SPECIAL_CHARS
 def validate_prefix(text: str) -> bool:
     if text == "":
         return True
-    return text.isalnum()
+    return text.isalpha()
 
 
 def validate_base_number(text: str) -> bool:
