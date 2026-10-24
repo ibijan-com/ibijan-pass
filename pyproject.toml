@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ibijan-pass"
+version = "0.9.1"
+description = "An offline, encrypted password generator with custom patterns."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "iBijan", email = "info@ibijan.com" }
+]
+dependencies = [
+    "cryptography>=41.0.0"
+]
+
+[project.urls]
+Homepage = "https://ibijan.com"
+Repository = "https://github.com/ibijan-com/ibijan-pass"
+
+[project.scripts]
+ibijan-pass = "spg.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["spg*"]
