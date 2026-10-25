@@ -66,10 +66,9 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Smart Password Generator")
-        self.root.minsize(650, 800)
+        self.root.minsize(650, 850) # Slightly taller to accommodate note
         self.root.configure(bg="#FFFFFF")
         
-        # Set Window Icon
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         if os.path.exists(icon_path):
             try:
@@ -81,7 +80,6 @@ class SPGApp:
         self.last_generated_password = ""
         self._setup_styles()
         
-        # Fix Ctrl+A select-all binding for Linux/X11
         self.root.bind_class("Entry", "<Control-a>", self._select_all)
         self.root.bind_class("Entry", "<Control-A>", self._select_all)
         self.root.bind_class("TEntry", "<Control-a>", self._select_all)
@@ -90,7 +88,6 @@ class SPGApp:
         self.check_authentication()
 
     def _select_all(self, event):
-        """Custom logic to select all text in Entry widgets on Ctrl+A"""
         event.widget.select_range(0, 'end')
         event.widget.icursor('end')
         return 'break'
@@ -239,14 +236,17 @@ class SPGApp:
         self.pattern_var = tk.StringVar(value=DEFAULT_PATTERN)
         ttk.Combobox(settings_frame, textvariable=self.pattern_var, values=list(PASSWORD_PATTERNS.keys()), width=40, state="readonly").grid(row=8, column=1, columnspan=2, sticky="w", padx=5)
 
+        # NEW: Note Field
+        tk.Label(settings_frame, text="Note (Optional):", bg="#FFFFFF").grid(row=9, column=0, sticky="w", padx=5, pady=5)
+        self.note_entry = PlaceholderEntry(settings_frame, placeholder="e.g., Work Email Account", width=40)
+        self.note_entry.grid(row=9, column=1, columnspan=2, padx=5, pady=5, sticky="w")
+
         action_frame = tk.Frame(main_frame, bg="#FFFFFF")
         action_frame.pack(fill="x", pady=10)
 
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
         ttk.Button(action_frame, text="💾 Save to Vault", style="Success.TButton", command=self.save_to_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
-        
-        # NEW: Clear Button
         ttk.Button(action_frame, text="🧹 Clear", command=self.clear_inputs).pack(side="left", padx=15)
 
         data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
@@ -351,8 +351,10 @@ class SPGApp:
         if not pw:
             messagebox.showerror("Error", warning or "Please fill in all fields to generate a password.", parent=self.root)
             return
+            
+        note = self.note_entry.get_value()
 
-        success, msg = save_to_vault(svc, pw)
+        success, msg = save_to_vault(svc, pw, note)
         if success:
             messagebox.showinfo("Success", f"{msg}\nPassword: {pw}", parent=self.root)
         else:
@@ -361,7 +363,7 @@ class SPGApp:
     def clear_inputs(self):
         """Clears all input fields and resets the form."""
         for entry in [self.profile_name_entry, self.prefix_entry, self.base_entry, 
-                      self.special_entry, self.service_entry, self.capitalize_entry]:
+                      self.special_entry, self.service_entry, self.capitalize_entry, self.note_entry]:
             entry._clear_placeholder()
             entry.delete(0, tk.END)
             entry._add_placeholder()
@@ -371,14 +373,48 @@ class SPGApp:
         self.last_generated_password = ""
 
     def view_vault(self):
-        vault_text = get_vault_data()
-        if not vault_text:
+        vault_data = get_vault_data()
+        if not vault_data:
             messagebox.showinfo("Vault Empty", "No saved passwords.", parent=self.root)
             return
         
         vw = tk.Toplevel(self.root)
         vw.title("Saved Passwords")
-        vw.geometry("400x300")
-        text = tk.Text(vw, wrap="word")
-        text.insert("1.0", vault_text)
-        text.pack(expand=True, fill="both", padx=10, pady=10)
+        vw.geometry("600x400")
+        
+        # Setup Treeview (Table)
+        tree_frame = tk.Frame(vw)
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        tree_scroll = ttk.Scrollbar(tree_frame)
+        tree_scroll.pack(side="right", fill="y")
+        
+        tree = ttk.Treeview(tree_frame, columns=("Service", "Password", "Note"), show="headings", yscrollcommand=tree_scroll.set)
+        tree_scroll.config(command=tree.yview)
+        
+        tree.heading("Service", text="Service")
+        tree.heading("Password", text="Password")
+        tree.heading("Note", text="Note")
+        
+        tree.column("Service", width=120)
+        tree.column("Password", width=150)
+        tree.column("Note", width=250)
+        
+        # Insert data
+        for row in vault_data:
+            tree.insert("", "end", values=row)
+            
+        tree.pack(fill="both", expand=True)
+
+        # Add Copy Button
+        def copy_selected():
+            selected = tree.selection()
+            if not selected:
+                messagebox.showinfo("Copy", "Please select a row first.", parent=vw)
+                return
+            item = tree.item(selected[0])
+            password = item['values'][1]
+            clipboard_manager.copy_to_clipboard(password)
+            messagebox.showinfo("Copied", "Password copied to clipboard!", parent=vw)
+
+        ttk.Button(vw, text="📋 Copy Selected Password", style="Primary.TButton", command=copy_selected).pack(pady=10)

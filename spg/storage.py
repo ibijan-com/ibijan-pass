@@ -2,17 +2,17 @@
 Storage layer for SPG.
 
 Handles all disk I/O for profiles and the password vault.
-Returns (success: bool, message: str) tuples to keep UI logic separate.
 """
 
 import os
 import json
+import csv
+import io
 from .config import PROFILES_FILE, VAULT_FILE
 from .crypto import fernet
 
 
 class DataManager:
-    """Caches profiles in memory to avoid disk reads on every keystroke."""
     def __init__(self):
         self._profiles_cache = None
         self._cache_dirty = False
@@ -39,9 +39,7 @@ class DataManager:
         return {}
 
 
-# Singleton instance
 data_manager = DataManager()
-
 
 # ============================================================
 # Profile CRUD
@@ -99,8 +97,7 @@ def load_profile(profile_name: str) -> dict | None:
 # ============================================================
 # Vault CRUD
 # ============================================================
-
-def save_to_vault(service: str, password: str) -> tuple[bool, str]:
+def save_to_vault(service: str, password: str, note: str = "") -> tuple[bool, str]:
     data = []
     
     if os.path.exists(VAULT_FILE):
@@ -108,20 +105,29 @@ def save_to_vault(service: str, password: str) -> tuple[bool, str]:
             with open(VAULT_FILE, "rb") as f:
                 encrypted = f.read()
             decrypted = fernet.decrypt(encrypted).decode()
-            lines = decrypted.strip().split("\n")
-            for line in lines[1:]:
-                if "," in line:
-                    svc, pw = line.split(",", 1)
-                    data.append((svc, pw))
+            reader = csv.reader(io.StringIO(decrypted.strip()))
+            next(reader, None) # Skip header
+            for row in reader:
+                if len(row) >= 2:
+                    svc = row[0]
+                    pw = row[1]
+                    nt = row[2] if len(row) > 2 else ""
+                    data.append((svc, pw, nt))
         except Exception as e:
             return False, f"Could not read vault: {e}"
 
-    # NEW: Check for duplicates
-    if (service, password) in data:
-        return False, "This exact password is already saved in the vault!"
+    # Check for duplicates (same service and password)
+    if any(item[0] == service and item[1] == password for item in data):
+        return False, "This exact password is already saved for this service!"
 
-    data.append((service, password))
-    csv_content = "service,password\n" + "\n".join([f"{s},{p}" for s, p in data])
+    data.append((service, password, note))
+    
+    # Write back to CSV safely
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["service", "password", "note"])
+    writer.writerows(data)
+    csv_content = output.getvalue()
     
     try:
         encrypted = fernet.encrypt(csv_content.encode())
@@ -131,14 +137,23 @@ def save_to_vault(service: str, password: str) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Failed to save to vault: {e}"
 
-def get_vault_data() -> str | None:
-    """Returns the raw decrypted vault string, or None if empty/error."""
+
+def get_vault_data() -> list[tuple[str, str, str]] | None:
+    """Returns a list of (service, password, note) tuples, or None if empty/error."""
     if not os.path.exists(VAULT_FILE):
         return None
     try:
         with open(VAULT_FILE, "rb") as f:
             encrypted = f.read()
-        return fernet.decrypt(encrypted).decode()
+        decrypted = fernet.decrypt(encrypted).decode()
+        
+        reader = csv.reader(io.StringIO(decrypted.strip()))
+        next(reader, None) # Skip header
+        data = []
+        for row in reader:
+            if len(row) >= 2:
+                data.append((row[0], row[1], row[2] if len(row) > 2 else ""))
+        return data
     except Exception as e:
         print(f"Vault decryption error: {e}")
         return None
