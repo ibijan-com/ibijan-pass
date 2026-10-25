@@ -73,9 +73,9 @@ jobs:
           
       - name: Build AppImage
         run: |
-          # Download appimagetool
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
+          # Download appimagetool to /tmp to avoid uploading it accidentally
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
+          chmod +x /tmp/appimagetool.AppImage
           
           # Create AppDir structure
           mkdir -p AppDir/usr/bin
@@ -103,18 +103,18 @@ jobs:
             cp AppDir/ibijan-pass.png AppDir/.DirIcon
           fi
           
+          # Create AppRun
           cat << 'EOF' > AppDir/AppRun
           #!/bin/sh
           exec "$APPDIR/usr/bin/ibijan-pass" "$@"
           EOF
           chmod +x AppDir/AppRun
-          # ⬆️ ------------------------------------------- ⬆️
           
-          # Build AppImage (using --appimage-extract-and-run to avoid FUSE issues in CI)
-          ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ibijan-pass-0.9.1-x86_64.AppImage
+          # Build AppImage using the tool in /tmp
+          /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-0.9.1-x86_64.AppImage
           
-          chmod +x ibijan-pass-0.9.1-x86_64.AppImage                    
-      - name: Upload Linux Artifacts
+          chmod +x ibijan-pass-0.9.1-x86_64.AppImage
+                - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-packages
