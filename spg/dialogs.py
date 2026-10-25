@@ -155,7 +155,7 @@ def factory_reset(root, on_complete_callback=None):
     confirm_window.geometry("450x250")
     confirm_window.transient(root)
     confirm_window.grab_set()
-
+    confirm_window.resizable(False, False)
     tk.Label(confirm_window, text="⚠️ FINAL CONFIRMATION REQUIRED",
              font=("Helvetica", 12, "bold"), fg="#CC3333").pack(pady=10)
 

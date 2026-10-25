@@ -94,7 +94,8 @@ def show_export_dialog(root):
     export_window.geometry("450x350")
     export_window.transient(root)
     export_window.grab_set()
-    
+    export_window.resizable(False, False)
+
     tk.Label(export_window, text="📤 Export Data", font=("Arial", 14, "bold"), fg="#1C39BB").pack(pady=10)
     
     tk.Label(export_window, text="Select data to export:").pack(anchor="w", padx=20, pady=5)
@@ -137,7 +138,7 @@ def show_import_dialog(root, on_import_success=None):
     import_window.geometry("450x300")
     import_window.transient(root)
     import_window.grab_set()
-    
+    import_window.resizable(False, False)
     tk.Label(import_window, text="📥 Import Data", font=("Arial", 14, "bold"), fg="#1C39BB").pack(pady=10)
     
     tk.Label(import_window, text="Import Key (if encrypted):").pack(anchor="w", padx=20, pady=5)
