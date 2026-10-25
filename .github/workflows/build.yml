@@ -103,12 +103,17 @@ jobs:
             cp AppDir/ibijan-pass.png AppDir/.DirIcon
           fi
           
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/sh
+          exec "$APPDIR/usr/bin/ibijan-pass" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          # ⬆️ ------------------------------------------- ⬆️
+          
           # Build AppImage (using --appimage-extract-and-run to avoid FUSE issues in CI)
           ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ibijan-pass-0.9.1-x86_64.AppImage
           
-          # ⬇️ اصلاح شد: نام فایل به انتهای دستور اضافه شد
-          chmod +x ibijan-pass-0.9.1-x86_64.AppImage
-                    
+          chmod +x ibijan-pass-0.9.1-x86_64.AppImage                    
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
