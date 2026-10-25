@@ -57,7 +57,7 @@ jobs:
           Icon=ibijan-pass
           Terminal=false
           Type=Application
-          Categories=Utility;Security;
+          Categories=Utility;
           EOF
           
           # Copy icon if exists
@@ -90,18 +90,25 @@ jobs:
           Icon=ibijan-pass
           Terminal=false
           Type=Application
-          Categories=Utility;Security;
+          Categories=Utility;
           EOF
           
-          # Copy icon if exists
+          # Copy icon if exists, otherwise create a fallback 1x1 transparent PNG
           if [ -f spg/icon.png ]; then
             cp spg/icon.png AppDir/ibijan-pass.png
             cp spg/icon.png AppDir/.DirIcon
+          else
+            echo "⚠️ icon.png not found in spg/. Using a fallback 1x1 PNG."
+            echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > AppDir/ibijan-pass.png
+            cp AppDir/ibijan-pass.png AppDir/.DirIcon
           fi
           
           # Build AppImage (using --appimage-extract-and-run to avoid FUSE issues in CI)
           ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ibijan-pass-0.9.1-x86_64.AppImage
           
+          # ⬇️ اصلاح شد: نام فایل به انتهای دستور اضافه شد
+          chmod +x ibijan-pass-0.9.1-x86_64.AppImage
+                    
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
