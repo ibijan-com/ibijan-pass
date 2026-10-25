@@ -103,7 +103,7 @@ jobs:
             cp AppDir/ibijan-pass.png AppDir/.DirIcon
           fi
           
-          # Create AppRun
+          # Create AppRun script for AppImage execution
           cat << 'EOF' > AppDir/AppRun
           #!/bin/sh
           exec "$APPDIR/usr/bin/ibijan-pass" "$@"
@@ -114,7 +114,8 @@ jobs:
           /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-0.9.1-x86_64.AppImage
           
           chmod +x ibijan-pass-0.9.1-x86_64.AppImage
-                - name: Upload Linux Artifacts
+
+      - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-packages
