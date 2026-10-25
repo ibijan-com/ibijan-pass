@@ -27,15 +27,15 @@ def show_comprehensive_help(root):
     
     tabs = {
         "🚀 Quick Start": """
-1. Enter a Prefix (e.g., BI)
-2. Enter a Base Number (e.g., 100)
-3. Add Special Characters (e.g., @)
-4. Enter Service Name (e.g., gmail)
-5. (Optional) Enter a Capitalize Letter (e.g., G)
-6. Click "Generate Password"
+1. Enter a Prefix (Letters only, e.g., BI).
+2. Enter a Base Number (Numbers only, e.g., 100).
+3. Add Special Characters (e.g., @).
+4. Enter Service Name (e.g., gmail).
+5. (Optional) Enter a Capitalize Letter (e.g., G).
+6. Click "Generate Password".
 
 Your password will be copied to the clipboard automatically!
-You can save your settings as a Profile for later use.
+Click "Clear" to reset all fields and start over.
 
 How the math works (Example: gmail, Base 100, Letter G):
 • Service "gmail" has 5 letters.
@@ -64,15 +64,20 @@ Available Arrangement Patterns:
 5. PREFIX + SPECIAL + MIDDLE + END_NUMBER (BI@5G105)
 6. END_NUMBER + SPECIAL + PREFIX + MIDDLE (105@BI5G)
 """,
-        "🔒 Security": """
+        "🔒 Vault & Security": """
 • Master Password: Encrypts all your data. Cannot be recovered if lost.
 • Secure Profiles (🔒): Require the master password every time you load them. Great for Banking or Email.
 • Normal Profiles (📁): Load instantly without prompts.
-• Vault: All saved passwords are encrypted using AES-128.
+
+💾 Password Vault:
+• View Vault: Shows a table of your saved passwords.
+• Note Column: You can add an optional note (e.g., "Work Email") when saving a password to help you remember it.
+• Copying: Select any row in the Vault table and click "Copy Selected Password" to copy it securely to your clipboard.
+• Clear Vault: Permanently deletes all saved passwords from your vault.
 """,
         "💾 Backup": """
 • Export Data: Saves your profiles and vault to a .spg file.
-• Advanced Security: You can encrypt the backup with a separate key.
+• Advanced Security: You can encrypt the backup with a separate key. If you do, you MUST keep that key safe, otherwise you cannot import the file!
 • Import Data: Restores your data. Existing profiles with the same name will NOT be overwritten.
 """,
         "🔧 Troubleshooting": """
@@ -84,6 +89,9 @@ Available Arrangement Patterns:
 
 • Lost your Import Key?
   The backup file cannot be decrypted.
+
+• Inputs not working?
+  For security reasons, some fields are restricted (e.g., Base Number only accepts digits, Prefix only accepts letters).
 """
     }
     
