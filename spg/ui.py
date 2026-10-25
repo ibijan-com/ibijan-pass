@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 import os
 
+from .clipboard import clipboard_manager, ToolTip
 from .config import (
     APP_VERSION, APP_WEBSITE, CONFIG_DIR, PASSWORD_PATTERNS, DEFAULT_PATTERN,
     BRAND_PRIMARY, BRAND_DARK, COLOR_SUCCESS, COLOR_DANGER, COLOR_NEUTRAL
@@ -16,7 +17,6 @@ from .storage import (
     save_to_vault, get_vault_data, clear_vault
 )
 from .generator import build_password
-from .clipboard import clipboard_manager
 from .dialogs import (
     verify_master_password_for_profile, show_file_locations, 
     factory_reset, open_config_folder, show_about_dialog
@@ -66,7 +66,7 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Smart Password Generator")
-        self.root.minsize(650, 850) # Slightly taller to accommodate note
+        self.root.minsize(650, 850)
         self.root.configure(bg="#FFFFFF")
         
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -96,14 +96,21 @@ class SPGApp:
         style = ttk.Style()
         style.theme_use('clam')
         
+        # Primary Button (Blue)
         style.configure("Primary.TButton", background=BRAND_PRIMARY, foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Primary.TButton", background=[("active", BRAND_DARK)])
         
+        # Success Button (Green)
         style.configure("Success.TButton", background=COLOR_SUCCESS, foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Success.TButton", background=[("active", "#008a7b")])
         
+        # Danger Button (Red)
         style.configure("Danger.TButton", background=COLOR_DANGER, foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Danger.TButton", background=[("active", "#a32929")])
+
+        # NEW: Neutral Button (Grey-Blue) for Clear
+        style.configure("Neutral.TButton", background="#6B7280", foreground="white", font=("Helvetica", 10, "bold"), padding=5)
+        style.map("Neutral.TButton", background=[("active", "#4B5563")])
 
     def clear_screen(self):
         for widget in self.root.winfo_children():
@@ -183,7 +190,11 @@ class SPGApp:
         self.profile_combo.grid(row=0, column=1, padx=5, pady=10)
         self.update_profile_combo()
         
-        ttk.Button(profile_frame, text="📥 Load", style="Primary.TButton", command=self.load_selected_profile).grid(row=0, column=2, padx=2)
+        # FIXED: No duplicated buttons here anymore
+        btn_load = ttk.Button(profile_frame, text="📥 Load", style="Primary.TButton", command=self.load_selected_profile)
+        btn_load.grid(row=0, column=2, padx=2)
+        ToolTip(btn_load, "Load the selected profile from the dropdown menu.")
+
         ttk.Button(profile_frame, text="🗑️ Delete", style="Danger.TButton", command=self.delete_selected_profile).grid(row=0, column=3, padx=2)
 
         settings_frame = tk.LabelFrame(main_frame, text=" 🔧 Password Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
@@ -236,7 +247,6 @@ class SPGApp:
         self.pattern_var = tk.StringVar(value=DEFAULT_PATTERN)
         ttk.Combobox(settings_frame, textvariable=self.pattern_var, values=list(PASSWORD_PATTERNS.keys()), width=40, state="readonly").grid(row=8, column=1, columnspan=2, sticky="w", padx=5)
 
-        # NEW: Note Field
         tk.Label(settings_frame, text="Note (Optional):", bg="#FFFFFF").grid(row=9, column=0, sticky="w", padx=5, pady=5)
         self.note_entry = PlaceholderEntry(settings_frame, placeholder="e.g., Work Email Account", width=40)
         self.note_entry.grid(row=9, column=1, columnspan=2, padx=5, pady=5, sticky="w")
@@ -247,7 +257,8 @@ class SPGApp:
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
         ttk.Button(action_frame, text="💾 Save to Vault", style="Success.TButton", command=self.save_to_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
-        ttk.Button(action_frame, text="🧹 Clear", command=self.clear_inputs).pack(side="left", padx=15)
+        # Apply the Neutral style to the Clear button
+        ttk.Button(action_frame, text="🧹 Clear", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=15)
 
         data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         data_frame.pack(fill="x", pady=10)
@@ -277,7 +288,20 @@ class SPGApp:
 
     def load_selected_profile(self):
         display_name = self.profile_var.get()
-        if not display_name: return
+        profiles = data_manager.get_profiles()
+        
+        if not display_name:
+            if not profiles:
+                messagebox.showinfo("No Profiles", 
+                                    "You haven't saved any profiles yet.\n\n"
+                                    "Please fill out the settings and click 'Save As New' first.", 
+                                    parent=self.root)
+            else:
+                messagebox.showwarning("Select a Profile", 
+                                       "Please select a profile from the dropdown menu first, then click Load.", 
+                                       parent=self.root)
+            return
+            
         profile_name = display_name.replace("🔒 ", "").replace("📁 ", "")
         profile_data = load_profile(profile_name)
         
@@ -295,7 +319,7 @@ class SPGApp:
             self.quotation_var.set(profile_data.get("quotation_style", "single"))
             self.pattern_var.set(profile_data.get("password_pattern", DEFAULT_PATTERN))
             messagebox.showinfo("Loaded", f"Profile '{profile_name}' loaded.", parent=self.root)
-
+            
     def save_current_profile(self):
         name = self.profile_name_entry.get_value().strip() or f"Profile_{len(data_manager.get_profiles()) + 1}"
         success, msg = save_profile(
@@ -341,7 +365,6 @@ class SPGApp:
             messagebox.showerror("Error", "Please enter a Service Name first!", parent=self.root)
             return
 
-        # Build password on the fly based on CURRENT inputs
         pw, warning = build_password(
             self.prefix_entry.get_value(), self.base_entry.get_value(), self.special_entry.get_value(),
             svc, self.capitalize_entry.get_value(),
@@ -361,7 +384,6 @@ class SPGApp:
             messagebox.showerror("Error", msg, parent=self.root)
 
     def clear_inputs(self):
-        """Clears all input fields and resets the form."""
         for entry in [self.profile_name_entry, self.prefix_entry, self.base_entry, 
                       self.special_entry, self.service_entry, self.capitalize_entry, self.note_entry]:
             entry._clear_placeholder()
@@ -381,8 +403,8 @@ class SPGApp:
         vw = tk.Toplevel(self.root)
         vw.title("Saved Passwords")
         vw.geometry("600x400")
+        vw.minsize(550, 350)
         
-        # Setup Treeview (Table)
         tree_frame = tk.Frame(vw)
         tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
@@ -400,13 +422,11 @@ class SPGApp:
         tree.column("Password", width=150)
         tree.column("Note", width=250)
         
-        # Insert data
         for row in vault_data:
             tree.insert("", "end", values=row)
             
         tree.pack(fill="both", expand=True)
 
-        # Add Copy Button
         def copy_selected():
             selected = tree.selection()
             if not selected:
