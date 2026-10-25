@@ -1,10 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 import os
-from .dialogs import (
-    verify_master_password_for_profile, show_file_locations, 
-    factory_reset, open_config_folder, show_about_dialog
-)
 
 from .config import (
     APP_VERSION, APP_WEBSITE, CONFIG_DIR, PASSWORD_PATTERNS, DEFAULT_PATTERN,
@@ -23,7 +19,7 @@ from .generator import build_password
 from .clipboard import clipboard_manager
 from .dialogs import (
     verify_master_password_for_profile, show_file_locations, 
-    factory_reset, open_config_folder
+    factory_reset, open_config_folder, show_about_dialog
 )
 from .backup import show_export_dialog, show_import_dialog
 from .help import show_comprehensive_help
@@ -97,7 +93,7 @@ class SPGApp:
         """Custom logic to select all text in Entry widgets on Ctrl+A"""
         event.widget.select_range(0, 'end')
         event.widget.icursor('end')
-        return 'break' # Prevent default Tkinter behavior
+        return 'break'
 
     def _setup_styles(self):
         style = ttk.Style()
@@ -178,11 +174,9 @@ class SPGApp:
         header_frame = tk.Frame(main_frame, bg="#FFFFFF")
         header_frame.pack(fill="x", pady=(0, 10))
         tk.Label(header_frame, text="🔐 iBijan Pass", font=("Helvetica", 16, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").pack(side="left")
-        
-        # Right-side header buttons
         ttk.Button(header_frame, text="💡 About", style="Primary.TButton", command=lambda: show_about_dialog(self.root)).pack(side="right", padx=5)
         ttk.Button(header_frame, text="📚 Help Guide", style="Primary.TButton", command=lambda: show_comprehensive_help(self.root)).pack(side="right")
-        
+
         profile_frame = tk.LabelFrame(main_frame, text=" 📁 Password Profiles ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         profile_frame.pack(fill="x", pady=(0, 15))
 
@@ -251,6 +245,9 @@ class SPGApp:
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
         ttk.Button(action_frame, text="💾 Save to Vault", style="Success.TButton", command=self.save_to_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
+        
+        # NEW: Clear Button
+        ttk.Button(action_frame, text="🧹 Clear", command=self.clear_inputs).pack(side="left", padx=15)
 
         data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         data_frame.pack(fill="x", pady=10)
@@ -340,12 +337,38 @@ class SPGApp:
 
     def save_to_vault(self):
         svc = self.service_entry.get_value()
-        if not svc or not self.last_generated_password:
-            messagebox.showerror("Error", "Generate a password first!", parent=self.root)
+        if not svc:
+            messagebox.showerror("Error", "Please enter a Service Name first!", parent=self.root)
             return
-        success, msg = save_to_vault(svc, self.last_generated_password)
-        if success: messagebox.showinfo("Success", msg, parent=self.root)
-        else: messagebox.showerror("Error", msg, parent=self.root)
+
+        # Build password on the fly based on CURRENT inputs
+        pw, warning = build_password(
+            self.prefix_entry.get_value(), self.base_entry.get_value(), self.special_entry.get_value(),
+            svc, self.capitalize_entry.get_value(),
+            self.quotation_var.get(), self.pattern_var.get()
+        )
+
+        if not pw:
+            messagebox.showerror("Error", warning or "Please fill in all fields to generate a password.", parent=self.root)
+            return
+
+        success, msg = save_to_vault(svc, pw)
+        if success:
+            messagebox.showinfo("Success", f"{msg}\nPassword: {pw}", parent=self.root)
+        else:
+            messagebox.showerror("Error", msg, parent=self.root)
+
+    def clear_inputs(self):
+        """Clears all input fields and resets the form."""
+        for entry in [self.profile_name_entry, self.prefix_entry, self.base_entry, 
+                      self.special_entry, self.service_entry, self.capitalize_entry]:
+            entry._clear_placeholder()
+            entry.delete(0, tk.END)
+            entry._add_placeholder()
+        
+        self.quotation_var.set("single")
+        self.pattern_var.set(DEFAULT_PATTERN)
+        self.last_generated_password = ""
 
     def view_vault(self):
         vault_text = get_vault_data()

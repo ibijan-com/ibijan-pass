@@ -99,10 +99,10 @@ def load_profile(profile_name: str) -> dict | None:
 # ============================================================
 # Vault CRUD
 # ============================================================
+
 def save_to_vault(service: str, password: str) -> tuple[bool, str]:
     data = []
     
-    # Read existing vault
     if os.path.exists(VAULT_FILE):
         try:
             with open(VAULT_FILE, "rb") as f:
@@ -116,7 +116,10 @@ def save_to_vault(service: str, password: str) -> tuple[bool, str]:
         except Exception as e:
             return False, f"Could not read vault: {e}"
 
-    # Add new entry and save
+    # NEW: Check for duplicates
+    if (service, password) in data:
+        return False, "This exact password is already saved in the vault!"
+
     data.append((service, password))
     csv_content = "service,password\n" + "\n".join([f"{s},{p}" for s, p in data])
     
@@ -127,7 +130,6 @@ def save_to_vault(service: str, password: str) -> tuple[bool, str]:
         return True, f"Password for '{service}' saved securely."
     except Exception as e:
         return False, f"Failed to save to vault: {e}"
-
 
 def get_vault_data() -> str | None:
     """Returns the raw decrypted vault string, or None if empty/error."""
