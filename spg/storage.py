@@ -2,17 +2,20 @@
 Storage layer for SPG.
 
 Handles all disk I/O for profiles and the password vault.
+Returns (success: bool, message: str) tuples to keep UI logic separate.
 """
 
 import os
 import json
 import csv
 import io
+from cryptography.fernet import InvalidToken
 from .config import PROFILES_FILE, VAULT_FILE
 from .crypto import fernet
 
 
 class DataManager:
+    """Caches profiles in memory to avoid disk reads on every keystroke."""
     def __init__(self):
         self._profiles_cache = None
         self._cache_dirty = False
@@ -39,7 +42,9 @@ class DataManager:
         return {}
 
 
+# Singleton instance
 data_manager = DataManager()
+
 
 # ============================================================
 # Profile CRUD
@@ -113,8 +118,10 @@ def save_to_vault(service: str, password: str, note: str = "") -> tuple[bool, st
                     pw = row[1]
                     nt = row[2] if len(row) > 2 else ""
                     data.append((svc, pw, nt))
+        except InvalidToken:
+            return False, "Vault encryption key mismatch.\n\nThis usually happens if you imported a backup created on another PC. Please click 'Clear Vault' and try again."
         except Exception as e:
-            return False, f"Could not read vault: {e}"
+            return False, f"Could not read vault: {str(e) or type(e).__name__}"
 
     # Check for duplicates (same service and password)
     if any(item[0] == service and item[1] == password for item in data):

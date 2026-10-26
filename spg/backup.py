@@ -1,3 +1,10 @@
+"""
+Backup (Export/Import) logic for SPG.
+
+Encrypts backups using a password-derived key so they can be
+restored on ANY machine, even after a Factory Reset.
+"""
+
 import os
 import json
 import base64
@@ -10,6 +17,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from .config import VAULT_FILE, PROFILES_FILE
 from .storage import data_manager
 from .dialogs import show_custom_error
+from .crypto import fernet as local_fernet
 
 def _derive_key(password: str) -> bytes:
     """Derive a valid Fernet key from a simple text password."""
@@ -22,7 +30,7 @@ def _derive_key(password: str) -> bytes:
 def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
     try:
         export_payload = {
-            "version": "0.9.1",
+            "version": "0.9.2",
             "export_date": datetime.now().isoformat(),
             "type": export_type,
             "data": {}
@@ -34,7 +42,12 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
         if export_type in ['vault', 'all'] and os.path.exists(VAULT_FILE):
             with open(VAULT_FILE, "rb") as f:
                 vault_encrypted = f.read()
-            export_payload["data"]["vault"] = base64.b64encode(vault_encrypted).decode()
+            try:
+                # Decrypt vault using the local machine's key and store raw text in the backup
+                vault_decrypted = local_fernet.decrypt(vault_encrypted).decode()
+                export_payload["data"]["vault_text"] = vault_decrypted
+            except Exception:
+                pass # Skip if vault is empty or corrupted
         
         # Encrypt using the password-derived key
         key = _derive_key(password)
@@ -52,6 +65,7 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         with open(file_path, "rb") as f:
             encrypted_data = f.read()
         
+        # Decrypt using the password-derived key
         key = _derive_key(password)
         f = Fernet(key)
         decrypted_data = f.decrypt(encrypted_data)
@@ -71,17 +85,21 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
                     current_profiles[name] = data
                     imported_profiles += 1
             
-            from .crypto import fernet as local_fernet
+            # Save back using the local system's secure key
             encrypted_profiles = local_fernet.encrypt(json.dumps(current_profiles).encode())
             with open(PROFILES_FILE, "wb") as out_f:
                 out_f.write(encrypted_profiles)
             data_manager.invalidate_cache()
         
-        if "vault" in import_payload["data"]:
-            vault_data = base64.b64decode(import_payload["data"]["vault"])
+        # If backup contains raw vault text, encrypt it with the current local key
+        if "vault_text" in import_payload["data"]:
+            vault_text = import_payload["data"]["vault_text"]
+            vault_encrypted = local_fernet.encrypt(vault_text.encode())
             with open(VAULT_FILE, "wb") as out_f:
-                out_f.write(vault_data)
+                out_f.write(vault_encrypted)
             imported_vault += 1
+        elif "vault" in import_payload["data"]:
+            return False, "This backup file is from an older version and cannot be restored after a factory reset. Please create a new backup from the original system."
         
         return True, f"Import completed!\nProfiles restored: {imported_profiles}\nVault items restored: {imported_vault}"
     
@@ -90,6 +108,10 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Import failed: {str(e)}"
 
+
+# ==========================================
+# UI Dialogs for Backup
+# ==========================================
 def show_export_dialog(root):
     export_window = tk.Toplevel(root)
     export_window.title("Export Data")
@@ -127,6 +149,7 @@ def show_export_dialog(root):
             show_custom_error(export_window, "Export Error", msg)
     
     tk.Button(export_window, text="Export to File", command=perform_export, bg="#00A693", fg="white", font=("Helvetica", 10, "bold"), width=18).pack(pady=15)
+
 
 def show_import_dialog(root, on_import_success=None):
     import_window = tk.Toplevel(root)
