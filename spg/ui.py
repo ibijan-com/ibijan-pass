@@ -265,8 +265,7 @@ class SPGApp:
         btn_frame = tk.Frame(data_frame, bg="#FFFFFF")
         btn_frame.pack(pady=10)
         ttk.Button(btn_frame, text="📤 Export", style="Success.TButton", command=lambda: show_export_dialog(self.root)).pack(side="left", padx=10)
-        ttk.Button(btn_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.update_profile_combo)).pack(side="left", padx=10)
-
+        ttk.Button(btn_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.after_import_callback)).pack(side="left", padx=10)
         bottom_frame = tk.Frame(main_frame, bg="#FFFFFF")
         bottom_frame.pack(fill="x", side="bottom", pady=10)
         
@@ -287,8 +286,15 @@ class SPGApp:
         self.profile_combo['values'] = display_names
         if display_names:
             self.profile_combo.current(0) # Auto-select the first item
+
+    def after_import_callback(self):
+        """Called automatically after a successful import to refresh and load."""
+        self.update_profile_combo()
+        # If a profile is available in the dropdown, load it immediately
+        if self.profile_var.get():
+            self.load_selected_profile(show_msg=False)
             
-    def load_selected_profile(self):
+    def load_selected_profile(self, show_msg=True):
         display_name = self.profile_var.get()
         profiles = data_manager.get_profiles()
         
@@ -320,8 +326,12 @@ class SPGApp:
 
             self.quotation_var.set(profile_data.get("quotation_style", "single"))
             self.pattern_var.set(profile_data.get("password_pattern", DEFAULT_PATTERN))
-            messagebox.showinfo("Loaded", f"Profile '{profile_name}' loaded.", parent=self.root)
             
+            # Only show the success message if requested
+            if show_msg:
+                messagebox.showinfo("Loaded", f"Profile '{profile_name}' loaded.", parent=self.root)
+                
+                            
     def save_current_profile(self):
         name = self.profile_name_entry.get_value().strip() or f"Profile_{len(data_manager.get_profiles()) + 1}"
         success, msg = save_profile(
