@@ -3,7 +3,7 @@ name: Build & Release Linux Packages
 on:
   push:
     tags:
-      - 'v*' # Triggers when you push a tag like v0.9.1
+      - 'v*'
 
 permissions:
   contents: write
@@ -26,7 +26,6 @@ jobs:
           
       - name: Build Linux Binary with PyInstaller
         run: |
-          # If icon.png exists, use it; otherwise, build without it
           if [ -f spg/icon.png ]; then
             pyinstaller --noconfirm --onefile --windowed --name "ibijan-pass" --icon=spg/icon.png run.py
           else
@@ -65,23 +64,18 @@ jobs:
             cp spg/icon.png package/usr/share/icons/hicolor/256x256/apps/ibijan-pass.png
           fi
           
-          # Build .deb
-          fpm -s dir -t deb -n ibijan-pass -v 0.9.1 -C package usr/
-          
-          # Build .rpm
-          fpm -s dir -t rpm -n ibijan-pass -v 0.9.1 -C package usr/
+          # Build .deb and .rpm (Version updated to 0.9.2)
+          fpm -s dir -t deb -n ibijan-pass -v 0.9.2 -C package usr/
+          fpm -s dir -t rpm -n ibijan-pass -v 0.9.2 -C package usr/
           
       - name: Build AppImage
         run: |
-          # Download appimagetool to /tmp to avoid uploading it accidentally
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
           chmod +x /tmp/appimagetool.AppImage
           
-          # Create AppDir structure
           mkdir -p AppDir/usr/bin
           cp dist/ibijan-pass AppDir/usr/bin/
           
-          # Create desktop file for AppDir
           cat << 'EOF' > AppDir/ibijan-pass.desktop
           [Desktop Entry]
           Name=iBijan Pass
@@ -93,7 +87,6 @@ jobs:
           Categories=Utility;
           EOF
           
-          # Copy icon if exists, otherwise create a fallback 1x1 transparent PNG
           if [ -f spg/icon.png ]; then
             cp spg/icon.png AppDir/ibijan-pass.png
             cp spg/icon.png AppDir/.DirIcon
@@ -103,17 +96,15 @@ jobs:
             cp AppDir/ibijan-pass.png AppDir/.DirIcon
           fi
           
-          # Create AppRun script for AppImage execution
           cat << 'EOF' > AppDir/AppRun
           #!/bin/sh
           exec "$APPDIR/usr/bin/ibijan-pass" "$@"
           EOF
           chmod +x AppDir/AppRun
           
-          # Build AppImage using the tool in /tmp
-          /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-0.9.1-x86_64.AppImage
-          
-          chmod +x ibijan-pass-0.9.1-x86_64.AppImage
+          # Build AppImage (Version updated to 0.9.2)
+          /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-0.9.2-x86_64.AppImage
+          chmod +x ibijan-pass-0.9.2-x86_64.AppImage
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
