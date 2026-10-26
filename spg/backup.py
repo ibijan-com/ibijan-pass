@@ -52,7 +52,6 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         with open(file_path, "rb") as f:
             encrypted_data = f.read()
         
-        # Decrypt using the password-derived key
         key = _derive_key(password)
         f = Fernet(key)
         decrypted_data = f.decrypt(encrypted_data)
@@ -62,16 +61,16 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         if "version" not in import_payload or "data" not in import_payload:
             return False, "Invalid import file format."
         
-        imported_count = 0
+        imported_profiles = 0
+        imported_vault = 0
         
         if "profiles" in import_payload["data"]:
             current_profiles = data_manager.get_profiles()
             for name, data in import_payload["data"]["profiles"].items():
                 if name not in current_profiles:
                     current_profiles[name] = data
-                    imported_count += 1
+                    imported_profiles += 1
             
-            # Save back using the local system's secure key (from crypto.py)
             from .crypto import fernet as local_fernet
             encrypted_profiles = local_fernet.encrypt(json.dumps(current_profiles).encode())
             with open(PROFILES_FILE, "wb") as out_f:
@@ -82,15 +81,14 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
             vault_data = base64.b64decode(import_payload["data"]["vault"])
             with open(VAULT_FILE, "wb") as out_f:
                 out_f.write(vault_data)
-            imported_count += 1
+            imported_vault += 1
         
-        return True, f"Import completed! {imported_count} items restored."
+        return True, f"Import completed!\nProfiles restored: {imported_profiles}\nVault items restored: {imported_vault}"
     
     except InvalidToken:
         return False, "Incorrect Password!\n\nThe password you entered does not match this backup file. Please try again."
     except Exception as e:
         return False, f"Import failed: {str(e)}"
-
 
 def show_export_dialog(root):
     export_window = tk.Toplevel(root)

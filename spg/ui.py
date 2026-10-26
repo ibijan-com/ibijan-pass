@@ -285,7 +285,9 @@ class SPGApp:
         profiles = data_manager.get_profiles()
         display_names = [f"🔒 {name}" if data.get("require_master") else f"📁 {name}" for name, data in profiles.items()]
         self.profile_combo['values'] = display_names
-
+        if display_names:
+            self.profile_combo.current(0) # Auto-select the first item
+            
     def load_selected_profile(self):
         display_name = self.profile_var.get()
         profiles = data_manager.get_profiles()
