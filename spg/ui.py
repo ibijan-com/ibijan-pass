@@ -65,7 +65,7 @@ class PlaceholderEntry(tk.Entry):
 class SPGApp:
     def __init__(self, root):
         self.root = root
-        self.root.title(f"iBijan Pass v{APP_VERSION} - Smart Password Generator")
+        self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
         self.root.minsize(650, 850)
         self.root.configure(bg="#FFFFFF")
         
@@ -125,7 +125,8 @@ class SPGApp:
 
     def show_login_screen(self):
         tk.Label(self.root, text="🔐 iBijan Pass", font=("Helvetica", 24, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").pack(pady=(80, 5))
-        tk.Label(self.root, text="Smart Password Generator", font=("Helvetica", 12), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(pady=(0, 40))
+        tk.Label(self.root, text="Memorable Password Generation", font=("Helvetica", 12), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(pady=(0, 5))
+        tk.Label(self.root, text="A personal-pattern approach to generating passwords.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(pady=(0, 30))
         tk.Label(self.root, text="Enter your master password", font=("Helvetica", 11), bg="#FFFFFF").pack(pady=10)
         
         self.login_entry = tk.Entry(self.root, show="*", width=28, font=("Helvetica", 14), justify="center")

@@ -11,7 +11,7 @@ import os
 # Application metadata
 # ============================================================
 APP_NAME = "iBijan Pass" 
-APP_VERSION = "0.9.2"
+APP_VERSION = "0.9.3"
 APP_AUTHOR = "IbiJan"
 APP_WEBSITE = "https://ibijan.com"
 APP_DESCRIPTION = "Offline, encrypted password generator with custom patterns"
@@ -69,7 +69,7 @@ COLOR_BG_ALT     = "#F9FAFB"
 # ============================================================
 # UI Text
 # ============================================================
-APP_TAGLINE    = "Smart Password Generator"
+APP_TAGLINE    = "Memorable Password Generation"
 
 UI_FONT_FAMILY = "Helvetica" 
 UI_FONT_SIZE = 10

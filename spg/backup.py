@@ -1,5 +1,5 @@
 """
-Backup (Export/Import) logic for SPG.
+Backup (Export/Import) logic for iBijan Pass.
 
 Encrypts backups using a password-derived key so they can be
 restored on ANY machine, even after a Factory Reset.
@@ -138,7 +138,7 @@ def show_export_dialog(root):
     
     def perform_export():
         password = pw_entry.get().strip()
-        file_path = filedialog.asksaveasfilename(defaultextension=".spg", filetypes=[("SPG Backup", "*.spg")], parent=export_window)
+        file_path = filedialog.asksaveasfilename(defaultextension=".ibpass", filetypes=[("iBijan Pass Backup", "*.ibpass")], parent=export_window)
         if not file_path: return
         
         success, msg = _export_data(export_var.get(), file_path, password)
@@ -167,7 +167,7 @@ def show_import_dialog(root, on_import_success=None):
     
     def perform_import():
         password = pw_entry.get().strip()
-        file_path = filedialog.askopenfilename(filetypes=[("SPG Backup", "*.spg")], parent=import_window)
+        file_path = filedialog.askopenfilename(filetypes=[("iBijan Pass Backup", "*.ibpass")], parent=import_window)
         if not file_path: return
         
         success, msg = _import_data(file_path, password)

@@ -1,5 +1,6 @@
 # 🔐 iBijan Pass
-**Smart, Offline, and Encrypted Password Generator**
+**Memorable Password Generation**  
+*A personal-pattern approach to generating memorable passwords.*
 
 iBijan Pass is a secure, offline desktop application that generates highly customizable passwords based on your own patterns. It features a built-in encrypted vault and a profile management system to keep your accounts safe without relying on cloud services.
 
@@ -13,7 +14,7 @@ iBijan Pass is a secure, offline desktop application that generates highly custo
 ## ✨ Features
 
 - **Custom Generation Patterns:** Define exactly how your password is constructed using Prefixes, Base Numbers, Special Characters, and specific patterns.
-- **Portable Backup & Restore:** Export your data (Profiles and Vault) into a single `.spg` file. You can protect it with a custom password and restore it on **any computer**, even after a factory reset.
+- **Portable Backup & Restore:** Export your data (Profiles and Vault) into a single `.ibpass` file. You can protect it with a custom password and restore it on **any computer**, even after a factory reset.
 - **Encrypted Vault:** Save generated passwords securely. View them in a clean table format with optional notes for each account.
 - **Secure Profiles (🔒):** Add an extra layer of authentication for highly sensitive accounts (like Banking) requiring the Master Password.
 - **Military-Grade Encryption:** All local data is encrypted using AES-128 (Fernet).
@@ -36,22 +37,22 @@ AppImage is a portable format that runs on almost any Linux distribution without
 
 ~~~bash
 # Download the AppImage
-chmod +x ibijan-pass-0.9.2-x86_64.AppImage
-./ibijan-pass-0.9.2-x86_64.AppImage
+chmod +x ibijan-pass-0.9.3-x86_64.AppImage
+./ibijan-pass-0.9.3-x86_64.AppImage
 ~~~
 
 ### Option 2: DEB Package (Ubuntu / Debian / Kali)
 
 ~~~bash
 # Download the .deb file, then run:
-sudo apt install ./ibijan-pass_0.9.2_amd64.deb
+sudo apt install ./ibijan-pass_0.9.3_amd64.deb
 ~~~
 
 ### Option 3: RPM Package (Fedora / CentOS / RHEL)
 
 ~~~bash
 # Download the .rpm file, then run:
-sudo rpm -i ibijan-pass-0.9.2-1.x86_64.rpm
+sudo rpm -i ibijan-pass-0.9.3-1.x86_64.rpm
 ~~~
 
 ### Option 4: Run from Source (Developers)
@@ -74,7 +75,7 @@ Moving your data between computers has never been easier:
 
 1. Click **Export** and select "All Data".
 2. Set a **Backup Password** (highly recommended) or leave it blank for a portable unprotected backup.
-3. Save the `.spg` file.
+3. Save the `.ibpass` file.
 4. On the new machine (or after a factory reset), open iBijan Pass, click **Import**, enter the password (if set), and select the file.
 5. Your profiles and vault items will be immediately restored.
 
