@@ -119,6 +119,9 @@ jobs:
     needs: [build-linux]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code (to access CHANGELOG.md)
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
