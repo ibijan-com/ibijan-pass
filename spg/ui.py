@@ -7,7 +7,8 @@ from .config import (
     APP_VERSION, APP_WEBSITE, CONFIG_DIR, PASSWORD_PATTERNS, DEFAULT_PATTERN,
     BRAND_PRIMARY, BRAND_DARK, COLOR_SUCCESS, COLOR_DANGER, COLOR_NEUTRAL
 )
-from .crypto import is_master_set, save_master_hash, hash_password, verify_master
+# FIXED: Added get_fernet and KeyIntegrityError to imports
+from .crypto import is_master_set, save_master_hash, hash_password, verify_master, get_fernet, KeyIntegrityError
 from .validators import (
     validate_prefix, validate_base_number, validate_special_chars,
     validate_service_name, validate_capitalize_letter, validate_profile_name
@@ -108,7 +109,7 @@ class SPGApp:
         style.configure("Danger.TButton", background=COLOR_DANGER, foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Danger.TButton", background=[("active", "#a32929")])
 
-        # NEW: Neutral Button (Grey-Blue) for Clear
+        # Neutral Button (Grey-Blue) for Clear
         style.configure("Neutral.TButton", background="#6B7280", foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Neutral.TButton", background=[("active", "#4B5563")])
 
@@ -139,9 +140,15 @@ class SPGApp:
 
     def authenticate(self):
         if verify_master(self.login_entry.get()):
-            self.show_main_app()
+            # FIXED: Proper indentation for try/except block
+            try:
+                # Force key loading to catch corruption/missing key errors early
+                get_fernet()
+                self.show_main_app()
+            except KeyIntegrityError as e:
+                messagebox.showerror("Critical Security Error", str(e), parent=self.root)
         else:
-            messagebox.showerror("Access Denied", "Incorrect master password.")
+            messagebox.showerror("Access Denied", "Incorrect master password.", parent=self.root)
             self.login_entry.delete(0, tk.END)
             self.login_entry.focus()
 
@@ -191,7 +198,6 @@ class SPGApp:
         self.profile_combo.grid(row=0, column=1, padx=5, pady=10)
         self.update_profile_combo()
         
-        # FIXED: No duplicated buttons here anymore
         btn_load = ttk.Button(profile_frame, text="📥 Load", style="Primary.TButton", command=self.load_selected_profile)
         btn_load.grid(row=0, column=2, padx=2)
         ToolTip(btn_load, "Load the selected profile from the dropdown menu.")
@@ -258,7 +264,6 @@ class SPGApp:
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
         ttk.Button(action_frame, text="💾 Save to Vault", style="Success.TButton", command=self.save_to_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
-        # Apply the Neutral style to the Clear button
         ttk.Button(action_frame, text="🧹 Clear", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=15)
 
         data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
@@ -267,6 +272,7 @@ class SPGApp:
         btn_frame.pack(pady=10)
         ttk.Button(btn_frame, text="📤 Export", style="Success.TButton", command=lambda: show_export_dialog(self.root)).pack(side="left", padx=10)
         ttk.Button(btn_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.after_import_callback)).pack(side="left", padx=10)
+        
         bottom_frame = tk.Frame(main_frame, bg="#FFFFFF")
         bottom_frame.pack(fill="x", side="bottom", pady=10)
         
@@ -282,16 +288,19 @@ class SPGApp:
         ttk.Button(bottom_frame, text="🔥 Factory Reset", style="Danger.TButton", command=lambda: factory_reset(self.root, self.root.destroy)).pack(side="right", padx=2)
 
     def update_profile_combo(self):
-        profiles = data_manager.get_profiles()
-        display_names = [f"🔒 {name}" if data.get("require_master") else f"📁 {name}" for name, data in profiles.items()]
-        self.profile_combo['values'] = display_names
-        if display_names:
-            self.profile_combo.current(0) # Auto-select the first item
+        try:
+            profiles = data_manager.get_profiles()
+            display_names = [f"🔒 {name}" if data.get("require_master") else f"📁 {name}" for name, data in profiles.items()]
+            self.profile_combo['values'] = display_names
+            if display_names:
+                self.profile_combo.current(0)
+        except Exception as e:
+            messagebox.showerror("Data Error", f"Could not load profiles:\n{e}\n\nSaving is disabled to prevent data loss.", parent=self.root)
+            self.profile_combo['values'] = ["⚠️ ERROR: Profiles Corrupted"]
 
     def after_import_callback(self):
         """Called automatically after a successful import to refresh and load."""
         self.update_profile_combo()
-        # If a profile is available in the dropdown, load it immediately
         if self.profile_var.get():
             self.load_selected_profile(show_msg=False)
             
@@ -328,11 +337,9 @@ class SPGApp:
             self.quotation_var.set(profile_data.get("quotation_style", "single"))
             self.pattern_var.set(profile_data.get("password_pattern", DEFAULT_PATTERN))
             
-            # Only show the success message if requested
             if show_msg:
                 messagebox.showinfo("Loaded", f"Profile '{profile_name}' loaded.", parent=self.root)
                 
-                            
     def save_current_profile(self):
         name = self.profile_name_entry.get_value().strip() or f"Profile_{len(data_manager.get_profiles()) + 1}"
         success, msg = save_profile(
