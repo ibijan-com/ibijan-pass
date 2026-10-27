@@ -41,4 +41,4 @@ def validate_profile_name(text: str) -> bool:
 def validate_capitalize_letter(text: str) -> bool:
     if text == "":
         return True
-    return len(text) == 1 and text.isalpha()
+    return len(text) <= 3 and text.isalpha()

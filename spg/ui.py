@@ -7,7 +7,6 @@ from .config import (
     APP_VERSION, APP_WEBSITE, CONFIG_DIR, PASSWORD_PATTERNS, DEFAULT_PATTERN,
     BRAND_PRIMARY, BRAND_DARK, COLOR_SUCCESS, COLOR_DANGER, COLOR_NEUTRAL
 )
-# CORRECTED IMPORTS: Removed old functions, kept new ones
 from .crypto import is_master_set, setup_master_password, verify_master_password, get_fernet, KeyIntegrityError
 from .validators import (
     validate_prefix, validate_base_number, validate_special_chars,
@@ -15,7 +14,7 @@ from .validators import (
 )
 from .storage import (
     data_manager, save_profile, delete_profile, load_profile,
-    save_to_vault, get_vault_data, clear_vault
+    save_to_vault, get_vault_data, clear_vault, delete_from_vault # Added delete_from_vault
 )
 from .generator import build_password
 from .dialogs import (
@@ -67,7 +66,7 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
-        self.root.minsize(650, 850)
+        self.root.minsize(650, 820)
         self.root.configure(bg="#FFFFFF")
         
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -113,7 +112,6 @@ class SPGApp:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-    # FIXED: Corrected indentation for check_authentication
     def check_authentication(self):
         self.clear_screen()
         if is_master_set():
@@ -135,7 +133,6 @@ class SPGApp:
         self.login_entry.bind("<Return>", lambda e: self.authenticate())
         tk.Label(self.root, text=f"v{APP_VERSION} • {APP_WEBSITE}", font=("Helvetica", 8), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(side="bottom", pady=15)
 
-    # FIXED: Removed the duplicate authenticate method and used the new verify function
     def authenticate(self):
         password = self.login_entry.get()
         if verify_master_password(password):
@@ -239,25 +236,17 @@ class SPGApp:
         self.service_entry.grid(row=5, column=1, padx=5, pady=5, sticky="w")
         self.service_entry.bind("<Return>", lambda e: self.generate_password())
 
-        tk.Label(settings_frame, text="Capitalize Letter:", bg="#FFFFFF").grid(row=6, column=0, sticky="w", padx=5, pady=5)
-        self.capitalize_entry = PlaceholderEntry(settings_frame, placeholder="e.g., G", width=25, validate="key", validatecommand=vcmd_cap)
+        tk.Label(settings_frame, text="Capitalize Letter(s):", bg="#FFFFFF").grid(row=6, column=0, sticky="w", padx=5, pady=5)
+        self.capitalize_entry = PlaceholderEntry(settings_frame, placeholder="e.g., G or GM", width=25, validate="key", validatecommand=vcmd_cap)
         self.capitalize_entry.grid(row=6, column=1, padx=5, pady=5, sticky="w")
 
-        tk.Label(settings_frame, text="Quotation:", bg="#FFFFFF").grid(row=7, column=0, sticky="w", padx=5, pady=5)
-        self.quotation_var = tk.StringVar(value="single")
-        q_frame = tk.Frame(settings_frame, bg="#FFFFFF")
-        q_frame.grid(row=7, column=1, sticky="w")
-        tk.Radiobutton(q_frame, text="None", variable=self.quotation_var, value="none", bg="#FFFFFF").pack(side="left")
-        tk.Radiobutton(q_frame, text="Single ( ' )", variable=self.quotation_var, value="single", bg="#FFFFFF").pack(side="left")
-        tk.Radiobutton(q_frame, text="Double ( \" )", variable=self.quotation_var, value="double", bg="#FFFFFF").pack(side="left")
-
-        tk.Label(settings_frame, text="Pattern:", bg="#FFFFFF").grid(row=8, column=0, sticky="w", padx=5, pady=10)
+        tk.Label(settings_frame, text="Pattern:", bg="#FFFFFF").grid(row=7, column=0, sticky="w", padx=5, pady=10)
         self.pattern_var = tk.StringVar(value=DEFAULT_PATTERN)
-        ttk.Combobox(settings_frame, textvariable=self.pattern_var, values=list(PASSWORD_PATTERNS.keys()), width=40, state="readonly").grid(row=8, column=1, columnspan=2, sticky="w", padx=5)
+        ttk.Combobox(settings_frame, textvariable=self.pattern_var, values=list(PASSWORD_PATTERNS.keys()), width=40, state="readonly").grid(row=7, column=1, columnspan=2, sticky="w", padx=5)
 
-        tk.Label(settings_frame, text="Note (Optional):", bg="#FFFFFF").grid(row=9, column=0, sticky="w", padx=5, pady=5)
+        tk.Label(settings_frame, text="Note (Optional):", bg="#FFFFFF").grid(row=8, column=0, sticky="w", padx=5, pady=5)
         self.note_entry = PlaceholderEntry(settings_frame, placeholder="e.g., Work Email Account", width=40)
-        self.note_entry.grid(row=9, column=1, columnspan=2, padx=5, pady=5, sticky="w")
+        self.note_entry.grid(row=8, column=1, columnspan=2, padx=5, pady=5, sticky="w")
 
         action_frame = tk.Frame(main_frame, bg="#FFFFFF")
         action_frame.pack(fill="x", pady=10)
@@ -300,7 +289,6 @@ class SPGApp:
             self.profile_combo['values'] = ["⚠️ ERROR: Profiles Corrupted"]
 
     def after_import_callback(self):
-        """Called automatically after a successful import to refresh and load."""
         self.update_profile_combo()
         if self.profile_var.get():
             self.load_selected_profile(show_msg=False)
@@ -311,14 +299,9 @@ class SPGApp:
         
         if not display_name:
             if not profiles:
-                messagebox.showinfo("No Profiles", 
-                                    "You haven't saved any profiles yet.\n\n"
-                                    "Please fill out the settings and click 'Save As New' first.", 
-                                    parent=self.root)
+                messagebox.showinfo("No Profiles", "You haven't saved any profiles yet.\n\nPlease fill out the settings and click 'Save As New' first.", parent=self.root)
             else:
-                messagebox.showwarning("Select a Profile", 
-                                       "Please select a profile from the dropdown menu first, then click Load.", 
-                                       parent=self.root)
+                messagebox.showwarning("Select a Profile", "Please select a profile from the dropdown menu first, then click Load.", parent=self.root)
             return
             
         profile_name = display_name.replace("🔒 ", "").replace("📁 ", "")
@@ -335,7 +318,6 @@ class SPGApp:
                 entry.insert(0, profile_data.get(key, ""))
                 if not entry.get(): entry._add_placeholder()
 
-            self.quotation_var.set(profile_data.get("quotation_style", "single"))
             self.pattern_var.set(profile_data.get("password_pattern", DEFAULT_PATTERN))
             
             if show_msg:
@@ -345,7 +327,7 @@ class SPGApp:
         name = self.profile_name_entry.get_value().strip() or f"Profile_{len(data_manager.get_profiles()) + 1}"
         success, msg = save_profile(
             name, self.prefix_entry.get_value(), self.base_entry.get_value(), self.special_entry.get_value(),
-            self.capitalize_entry.get_value(), self.quotation_var.get(), self.pattern_var.get(),
+            self.capitalize_entry.get_value(), self.pattern_var.get(),
             self.require_master_var.get()
         )
         if success:
@@ -368,7 +350,7 @@ class SPGApp:
         pw, warning = build_password(
             self.prefix_entry.get_value(), self.base_entry.get_value(), self.special_entry.get_value(),
             self.service_entry.get_value(), self.capitalize_entry.get_value(),
-            self.quotation_var.get(), self.pattern_var.get()
+            self.pattern_var.get()
         )
         
         if warning: messagebox.showwarning("Warning", warning, parent=self.root)
@@ -389,7 +371,7 @@ class SPGApp:
         pw, warning = build_password(
             self.prefix_entry.get_value(), self.base_entry.get_value(), self.special_entry.get_value(),
             svc, self.capitalize_entry.get_value(),
-            self.quotation_var.get(), self.pattern_var.get()
+            self.pattern_var.get()
         )
 
         if not pw:
@@ -411,7 +393,6 @@ class SPGApp:
             entry.delete(0, tk.END)
             entry._add_placeholder()
         
-        self.quotation_var.set("single")
         self.pattern_var.set(DEFAULT_PATTERN)
         self.last_generated_password = ""
 
@@ -432,7 +413,8 @@ class SPGApp:
         tree_scroll = ttk.Scrollbar(tree_frame)
         tree_scroll.pack(side="right", fill="y")
         
-        tree = ttk.Treeview(tree_frame, columns=("Service", "Password", "Note"), show="headings", yscrollcommand=tree_scroll.set)
+        # selectmode="extended" allows selecting multiple items (Ctrl+Click or Shift+Click)
+        tree = ttk.Treeview(tree_frame, columns=("Service", "Password", "Note"), show="headings", selectmode="extended", yscrollcommand=tree_scroll.set)
         tree_scroll.config(command=tree.yview)
         
         tree.heading("Service", text="Service")
@@ -442,20 +424,70 @@ class SPGApp:
         tree.column("Service", width=120)
         tree.column("Password", width=150)
         tree.column("Note", width=250)
-        
+
+        def refresh_tree():
+            # Clear existing items
+            for item in tree.get_children():
+                tree.delete(item)
+            # Reload from storage
+            new_data = get_vault_data()
+            if new_data:
+                for row in new_data:
+                    tree.insert("", "end", values=row)
+
+        # Populate initial data
         for row in vault_data:
             tree.insert("", "end", values=row)
             
         tree.pack(fill="both", expand=True)
+
+        # Ctrl+A binding for Treeview
+        def select_all(event=None):
+            tree.selection_set(tree.get_children())
+            return "break"
+        
+        tree.bind("<Control-a>", select_all)
+        tree.bind("<Control-A>", select_all)
 
         def copy_selected():
             selected = tree.selection()
             if not selected:
                 messagebox.showinfo("Copy", "Please select a row first.", parent=vw)
                 return
+            # If multiple selected, copy the first one's password
             item = tree.item(selected[0])
             password = item['values'][1]
             clipboard_manager.copy_to_clipboard(password)
             messagebox.showinfo("Copied", "Password copied to clipboard!", parent=vw)
 
-        ttk.Button(vw, text="📋 Copy Selected Password", style="Primary.TButton", command=copy_selected).pack(pady=10)
+        def delete_selected():
+            selected = tree.selection()
+            if not selected:
+                messagebox.showinfo("Delete", "Please select at least one row to delete.", parent=vw)
+                return
+            
+            if not messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete {len(selected)} password(s)?\nThis action cannot be undone.", parent=vw):
+                return
+                
+            entries_to_delete = []
+            for item_id in selected:
+                item = tree.item(item_id)
+                vals = item['values']
+                if len(vals) >= 2:
+                    entries_to_delete.append((vals[0], vals[1]))
+
+            success, msg = delete_from_vault(entries_to_delete)
+            if success:
+                messagebox.showinfo("Success", msg, parent=vw)
+                refresh_tree()
+                if not tree.get_children():
+                    vw.destroy() # Close window if vault becomes empty
+            else:
+                messagebox.showerror("Error", msg, parent=vw)
+
+        # Action buttons at the bottom
+        btn_frame = tk.Frame(vw)
+        btn_frame.pack(pady=10)
+        
+        ttk.Button(btn_frame, text="📋 Copy Selected", style="Primary.TButton", command=copy_selected).pack(side="left", padx=10)
+        ttk.Button(btn_frame, text="🗑️ Delete Selected", style="Danger.TButton", command=delete_selected).pack(side="left", padx=10)

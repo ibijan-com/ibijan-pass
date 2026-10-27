@@ -1,5 +1,17 @@
 # Changelog
 
+## [v1.0.1] - 2026-10-27
+
+### Added
+- **Bulk Delete in Vault:** Added multi-select capability (`Ctrl+A` or `Shift+Click`) to the Vault table, allowing users to delete multiple saved passwords at once.
+- **Capitalization Upgrade:** The "Capitalize Letter(s)" input now accepts up to 3 characters, giving users more flexibility in generating passwords (e.g., typing "gom" will directly insert "GOM" instead of searching the service name).
+
+### Fixed
+- Removed the redundant "Quotation" feature from the UI, as users can simply add quotes to the "Special Characters" field.
+- Fixed a critical bug where profiles were not being saved to disk due to missing file write logic in the storage layer.
+
+---
+
 ## [v1.0.0] - 2026-10-27
 
 ###  MAJOR SECURITY UPGRADE

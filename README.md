@@ -15,7 +15,7 @@ iBijan Pass is a secure, offline desktop application that generates highly custo
 
 - **Custom Generation Patterns:** Define exactly how your password is constructed using Prefixes, Base Numbers, Special Characters, and specific patterns.
 - **Portable Backup & Restore:** Export your data (Profiles and Vault) into a single `.ibpass` file. You can protect it with a custom password and restore it on **any computer**, even after a factory reset.
-- **Encrypted Vault:** Save generated passwords securely. View them in a clean table format with optional notes for each account.
+- **Encrypted Vault:** Save generated passwords securely. View them in a clean table format, add optional notes, and easily copy or bulk-delete multiple entries.
 - **Secure Profiles (🔒):** Add an extra layer of authentication for highly sensitive accounts (like Banking) requiring the Master Password.
 - **Military-Grade Encryption:** All local data is encrypted using AES-128 (Fernet).
 - **Auto-Load:** After importing a backup, the app automatically loads your first profile for immediate use.
@@ -35,20 +35,20 @@ You can download the latest packages from the [Releases](https://github.com/ibij
 ### Option 1: AppImage (Recommended for all distros)
 ~~~bash
 # Download the AppImage
-chmod +x ibijan-pass-1.0.0-x86_64.AppImage
-./ibijan-pass-1.0.0-x86_64.AppImage
+chmod +x ibijan-pass-1.0.1-x86_64.AppImage
+./ibijan-pass-1.0.1-x86_64.AppImage
 ~~~
 
 ### Option 2: DEB Package (Ubuntu / Debian / Kali)
 ~~~bash
 # Download the .deb file, then run:
-sudo apt install ./ibijan-pass_1.0.0_amd64.deb
+sudo apt install ./ibijan-pass_1.0.1_amd64.deb
 ~~~
 
 ### Option 3: RPM Package (Fedora / CentOS / RHEL)
 ~~~bash
 # Download the .rpm file, then run:
-sudo rpm -i ibijan-pass-1.0.0-1.x86_64.rpm
+sudo rpm -i ibijan-pass-1.0.1-1.x86_64.rpm
 ~~~
 
 ### Option 4: Run from Source (Developers)
