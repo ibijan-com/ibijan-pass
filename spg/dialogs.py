@@ -9,7 +9,8 @@ from .config import (
     CONFIG_DIR, KEY_FILE, MASTER_HASH_FILE, VAULT_FILE, 
     PROFILES_FILE, APP_VERSION, APP_WEBSITE
 )
-from .crypto import verify_master
+# CORRECTED IMPORT: Using the new verify_master_password function
+from .crypto import verify_master_password
 from .clipboard import clipboard_manager
 
 
@@ -58,7 +59,8 @@ def verify_master_password_for_profile(root) -> bool:
     result = [False]
 
     def check_password():
-        if verify_master(password_entry.get()):
+        # CORRECTED: Using the new verify function
+        if verify_master_password(password_entry.get()):
             result[0] = True
             verify_window.destroy()
         else:
@@ -183,13 +185,11 @@ def factory_reset(root, on_complete_callback=None):
 
 def _perform_factory_reset(root, on_complete_callback):
     files_to_delete = [VAULT_FILE, PROFILES_FILE, MASTER_HASH_FILE, KEY_FILE]
-    deleted_files = []
-
+    
     for file_path in files_to_delete:
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-                deleted_files.append(os.path.basename(file_path))
             except Exception:
                 pass
 
@@ -227,7 +227,7 @@ def show_about_dialog(root):
     about_window.resizable(False, False)
 
     tk.Label(about_window, text="🔐 iBijan Pass", font=("Helvetica", 18, "bold"), fg="#1C39BB").pack(pady=(20, 5))
-    tk.Label(about_window, text="Smart Password Generator", font=("Helvetica", 11), fg="gray").pack()
+    tk.Label(about_window, text="Memorable Password Generation", font=("Helvetica", 11), fg="gray").pack()
     tk.Label(about_window, text=f"Version: {APP_VERSION}", font=("Helvetica", 9)).pack(pady=(5, 15))
     tk.Label(about_window, text="An offline, encrypted password generator\nwith custom patterns and vault storage.", justify="center").pack()
 
