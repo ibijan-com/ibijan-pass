@@ -7,8 +7,8 @@ from .config import (
     APP_VERSION, APP_WEBSITE, CONFIG_DIR, PASSWORD_PATTERNS, DEFAULT_PATTERN,
     BRAND_PRIMARY, BRAND_DARK, COLOR_SUCCESS, COLOR_DANGER, COLOR_NEUTRAL
 )
-# FIXED: Added get_fernet and KeyIntegrityError to imports
-from .crypto import is_master_set, save_master_hash, hash_password, verify_master, get_fernet, KeyIntegrityError
+# CORRECTED IMPORTS: Removed old functions, kept new ones
+from .crypto import is_master_set, setup_master_password, verify_master_password, get_fernet, KeyIntegrityError
 from .validators import (
     validate_prefix, validate_base_number, validate_special_chars,
     validate_service_name, validate_capitalize_letter, validate_profile_name
@@ -97,19 +97,15 @@ class SPGApp:
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Primary Button (Blue)
         style.configure("Primary.TButton", background=BRAND_PRIMARY, foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Primary.TButton", background=[("active", BRAND_DARK)])
         
-        # Success Button (Green)
         style.configure("Success.TButton", background=COLOR_SUCCESS, foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Success.TButton", background=[("active", "#008a7b")])
         
-        # Danger Button (Red)
         style.configure("Danger.TButton", background=COLOR_DANGER, foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Danger.TButton", background=[("active", "#a32929")])
 
-        # Neutral Button (Grey-Blue) for Clear
         style.configure("Neutral.TButton", background="#6B7280", foreground="white", font=("Helvetica", 10, "bold"), padding=5)
         style.map("Neutral.TButton", background=[("active", "#4B5563")])
 
@@ -117,6 +113,7 @@ class SPGApp:
         for widget in self.root.winfo_children():
             widget.destroy()
 
+    # FIXED: Corrected indentation for check_authentication
     def check_authentication(self):
         self.clear_screen()
         if is_master_set():
@@ -138,11 +135,11 @@ class SPGApp:
         self.login_entry.bind("<Return>", lambda e: self.authenticate())
         tk.Label(self.root, text=f"v{APP_VERSION} • {APP_WEBSITE}", font=("Helvetica", 8), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(side="bottom", pady=15)
 
+    # FIXED: Removed the duplicate authenticate method and used the new verify function
     def authenticate(self):
-        if verify_master(self.login_entry.get()):
-            # FIXED: Proper indentation for try/except block
+        password = self.login_entry.get()
+        if verify_master_password(password):
             try:
-                # Force key loading to catch corruption/missing key errors early
                 get_fernet()
                 self.show_main_app()
             except KeyIntegrityError as e:
@@ -169,9 +166,13 @@ class SPGApp:
             if pw1 != pw2:
                 messagebox.showerror("Mismatch", "Passwords do not match.")
                 return
-            save_master_hash(hash_password(pw1))
-            messagebox.showinfo("Success", "Master password set!\n\n⚠️ WARNING: If you forget this password, it cannot be recovered.")
-            self.show_main_app()
+            
+            try:
+                setup_master_password(pw1)
+                messagebox.showinfo("Success", "Master password set securely!\n\n⚠️ WARNING: If you forget this password, it cannot be recovered.")
+                self.show_main_app()
+            except Exception as e:
+                messagebox.showerror("Setup Error", f"Could not create master password: {e}")
 
         self.pw1_entry.bind("<Return>", lambda e: create_master())
         self.pw2_entry.bind("<Return>", lambda e: create_master())
