@@ -1,80 +1,97 @@
-"""
-Cryptographic primitives for SPG.
-
-Handles:
-- Fernet key generation and loading
-- Master password hashing (SHA-256)
-- Master password verification
-
-Depends on: config.py only.
-"""
-
 import os
-import hashlib
+import json
+import base64
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from .config import CONFIG_DIR, KEY_FILE, MASTER_HASH_FILE, PROFILES_FILE, VAULT_FILE
 
-from .config import CONFIG_DIR, KEY_FILE, MASTER_HASH_FILE
+class KeyIntegrityError(Exception):
+    pass
 
+_fernet_instance = None
 
-# ============================================================
-# Fernet key management
-# ============================================================
-def load_or_create_key() -> Fernet:
-    """
-    Load the Fernet encryption key from disk, or create it if it
-    doesn't exist.
+def set_fernet(instance: Fernet):
+    global _fernet_instance
+    _fernet_instance = instance
 
-    The key file is stored at ~/.spg/key.key.
+def get_fernet() -> Fernet:
+    if _fernet_instance is None:
+        raise KeyIntegrityError("Data key not loaded. Please authenticate first.")
+    return _fernet_instance
 
-    Returns:
-        Fernet: An initialized Fernet instance ready for encrypt/decrypt.
-    """
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-
-    if not os.path.exists(KEY_FILE):
-        key = Fernet.generate_key()
-        with open(KEY_FILE, "wb") as f:
-            f.write(key)
-    else:
-        with open(KEY_FILE, "rb") as f:
-            key = f.read()
-
-    return Fernet(key)
-
-
-# Singleton Fernet instance — imported by storage.py, backup.py, etc.
-fernet = load_or_create_key()
-
-
-# ============================================================
-# Master password hashing
-# ============================================================
-def hash_password(password: str) -> str:
-    """Return SHA-256 hex digest of the given password."""
-    return hashlib.sha256(password.encode()).hexdigest()
-
+def _derive_key(password: str, salt: bytes) -> bytes:
+    """Derive a 32-byte key using scrypt."""
+    kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
+    return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def is_master_set() -> bool:
-    """Return True if a master password has already been configured."""
-    return os.path.exists(MASTER_HASH_FILE)
+    return os.path.exists(KEY_FILE)
 
+def setup_master_password(password: str):
+    """Creates the master key file, generating a random data key and encrypting it."""
+    if os.path.exists(KEY_FILE):
+        raise ValueError("Master password is already set.")
 
-def save_master_hash(hashed_pw: str) -> None:
-    """Persist the (already-hashed) master password to disk."""
     os.makedirs(CONFIG_DIR, exist_ok=True)
+    # Set directory permissions to 0700 (only owner can read/write/execute)
+    if os.name == 'posix':
+        os.chmod(CONFIG_DIR, 0o700)
+
+    salt = os.urandom(16)
+    master_key = _derive_key(password, salt)
+    
+    # Generate a random Data Key for actual encryption
+    data_key = Fernet.generate_key()
+    f_master = Fernet(master_key)
+    encrypted_data_key = f_master.encrypt(data_key)
+
+    key_payload = {
+        "version": "1.0",
+        "salt": base64.b64encode(salt).decode('utf-8'),
+        "encrypted_data_key": encrypted_data_key.decode('utf-8')
+    }
+
+    with open(KEY_FILE, "w") as f:
+        json.dump(key_payload, f)
+    
+    if os.name == 'posix':
+        os.chmod(KEY_FILE, 0o600) # Only owner can read/write
+
+    # Also save the hash for quick UI checks (optional, but good for UX)
+    import hashlib
     with open(MASTER_HASH_FILE, "w") as f:
-        f.write(hashed_pw)
+        f.write(hashlib.sha256(password.encode()).hexdigest())
+    if os.name == 'posix':
+        os.chmod(MASTER_HASH_FILE, 0o600)
 
+    # Load it into memory
+    set_fernet(Fernet(data_key))
 
-def verify_master(password: str) -> bool:
-    """
-    Check if the given plaintext password matches the stored hash.
-
-    Returns:
-        bool: True if match, False otherwise (or if no master is set).
-    """
-    if not is_master_set():
+def verify_master_password(password: str) -> bool:
+    """Verifies the master password and loads the data key into memory."""
+    if not os.path.exists(KEY_FILE):
         return False
-    with open(MASTER_HASH_FILE, "r") as f:
-        stored_hash = f.read().strip()
-    return hash_password(password) == stored_hash
+
+    try:
+        with open(KEY_FILE, "r") as f:
+            key_payload = json.load(f)
+        
+        # Handle old format (raw key)
+        if "encrypted_data_key" not in key_payload:
+            raise KeyIntegrityError("Incompatible old key format. Please perform a Factory Reset.")
+
+        salt = base64.b64decode(key_payload["salt"])
+        encrypted_data_key = key_payload["encrypted_data_key"].encode('utf-8')
+
+        master_key = _derive_key(password, salt)
+        f_master = Fernet(master_key)
+        
+        # This will raise InvalidToken if the password is wrong
+        data_key = f_master.decrypt(encrypted_data_key)
+        
+        set_fernet(Fernet(data_key))
+        return True
+
+    except Exception:
+        # Do not reveal whether it was a JSON error or wrong password
+        return False

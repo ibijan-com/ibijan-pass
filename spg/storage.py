@@ -1,21 +1,12 @@
-"""
-Storage layer for SPG.
-
-Handles all disk I/O for profiles and the password vault.
-Returns (success: bool, message: str) tuples to keep UI logic separate.
-"""
-
 import os
 import json
 import csv
 import io
 from cryptography.fernet import InvalidToken
 from .config import PROFILES_FILE, VAULT_FILE
-from .crypto import fernet
-
+from .crypto import get_fernet
 
 class DataManager:
-    """Caches profiles in memory to avoid disk reads on every keystroke."""
     def __init__(self):
         self._profiles_cache = None
         self._cache_dirty = False
@@ -34,17 +25,15 @@ class DataManager:
             try:
                 with open(PROFILES_FILE, "rb") as f:
                     encrypted = f.read()
-                decrypted = fernet.decrypt(encrypted)
+                decrypted = get_fernet().decrypt(encrypted)
                 return json.loads(decrypted.decode())
+            except InvalidToken:
+                raise ValueError("Could not decrypt profiles. The file is corrupted.")
             except Exception as e:
-                print(f"Error loading profiles: {e}")
-                return {}
+                raise ValueError(f"Error reading profiles file: {str(e)}")
         return {}
 
-
-# Singleton instance
 data_manager = DataManager()
-
 
 # ============================================================
 # Profile CRUD
@@ -70,9 +59,11 @@ def save_profile(profile_name, prefix, base_number, special_chars,
     }
 
     try:
-        encrypted = fernet.encrypt(json.dumps(profiles).encode())
+        encrypted = get_fernet().encrypt(json.dumps(profiles).encode())
         with open(PROFILES_FILE, "wb") as f:
             f.write(encrypted)
+        if os.name == 'posix':
+            os.chmod(PROFILES_FILE, 0o600)
         data_manager.invalidate_cache()
         return True, f"Profile '{profile_name}' saved successfully!"
     except Exception as e:
@@ -84,7 +75,7 @@ def delete_profile(profile_name: str) -> bool:
     if profile_name in profiles:
         del profiles[profile_name]
         try:
-            encrypted = fernet.encrypt(json.dumps(profiles).encode())
+            encrypted = get_fernet().encrypt(json.dumps(profiles).encode())
             with open(PROFILES_FILE, "wb") as f:
                 f.write(encrypted)
             data_manager.invalidate_cache()
@@ -98,7 +89,6 @@ def load_profile(profile_name: str) -> dict | None:
     profiles = data_manager.get_profiles()
     return profiles.get(profile_name)
 
-
 # ============================================================
 # Vault CRUD
 # ============================================================
@@ -109,9 +99,9 @@ def save_to_vault(service: str, password: str, note: str = "") -> tuple[bool, st
         try:
             with open(VAULT_FILE, "rb") as f:
                 encrypted = f.read()
-            decrypted = fernet.decrypt(encrypted).decode()
+            decrypted = get_fernet().decrypt(encrypted).decode()
             reader = csv.reader(io.StringIO(decrypted.strip()))
-            next(reader, None) # Skip header
+            next(reader, None) 
             for row in reader:
                 if len(row) >= 2:
                     svc = row[0]
@@ -119,17 +109,15 @@ def save_to_vault(service: str, password: str, note: str = "") -> tuple[bool, st
                     nt = row[2] if len(row) > 2 else ""
                     data.append((svc, pw, nt))
         except InvalidToken:
-            return False, "Vault encryption key mismatch.\n\nThis usually happens if you imported a backup created on another PC. Please click 'Clear Vault' and try again."
+            return False, "Vault encryption key mismatch. The Vault file is corrupted."
         except Exception as e:
             return False, f"Could not read vault: {str(e) or type(e).__name__}"
 
-    # Check for duplicates (same service and password)
     if any(item[0] == service and item[1] == password for item in data):
         return False, "This exact password is already saved for this service!"
 
     data.append((service, password, note))
     
-    # Write back to CSV safely
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["service", "password", "note"])
@@ -137,33 +125,33 @@ def save_to_vault(service: str, password: str, note: str = "") -> tuple[bool, st
     csv_content = output.getvalue()
     
     try:
-        encrypted = fernet.encrypt(csv_content.encode())
+        encrypted = get_fernet().encrypt(csv_content.encode())
         with open(VAULT_FILE, "wb") as f:
             f.write(encrypted)
+        if os.name == 'posix':
+            os.chmod(VAULT_FILE, 0o600)
         return True, f"Password for '{service}' saved securely."
     except Exception as e:
         return False, f"Failed to save to vault: {e}"
 
 
 def get_vault_data() -> list[tuple[str, str, str]] | None:
-    """Returns a list of (service, password, note) tuples, or None if empty/error."""
     if not os.path.exists(VAULT_FILE):
         return None
     try:
         with open(VAULT_FILE, "rb") as f:
             encrypted = f.read()
-        decrypted = fernet.decrypt(encrypted).decode()
+        decrypted = get_fernet().decrypt(encrypted).decode()
         
         reader = csv.reader(io.StringIO(decrypted.strip()))
-        next(reader, None) # Skip header
+        next(reader, None) 
         data = []
         for row in reader:
             if len(row) >= 2:
                 data.append((row[0], row[1], row[2] if len(row) > 2 else ""))
         return data
     except Exception as e:
-        print(f"Vault decryption error: {e}")
-        return None
+        raise ValueError(f"Vault decryption error: {e}")
 
 
 def clear_vault() -> tuple[bool, str]:

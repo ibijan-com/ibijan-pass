@@ -33,26 +33,22 @@ iBijan Pass is a secure, offline desktop application that generates highly custo
 You can download the latest packages from the [Releases](https://github.com/ibijan-com/ibijan-pass/releases) page.
 
 ### Option 1: AppImage (Recommended for all distros)
-AppImage is a portable format that runs on almost any Linux distribution without installation.
-
 ~~~bash
 # Download the AppImage
-chmod +x ibijan-pass-0.9.3-x86_64.AppImage
-./ibijan-pass-0.9.3-x86_64.AppImage
+chmod +x ibijan-pass-1.0.0-x86_64.AppImage
+./ibijan-pass-1.0.0-x86_64.AppImage
 ~~~
 
 ### Option 2: DEB Package (Ubuntu / Debian / Kali)
-
 ~~~bash
 # Download the .deb file, then run:
-sudo apt install ./ibijan-pass_0.9.3_amd64.deb
+sudo apt install ./ibijan-pass_1.0.0_amd64.deb
 ~~~
 
 ### Option 3: RPM Package (Fedora / CentOS / RHEL)
-
 ~~~bash
 # Download the .rpm file, then run:
-sudo rpm -i ibijan-pass-0.9.3-1.x86_64.rpm
+sudo rpm -i ibijan-pass-1.0.0-1.x86_64.rpm
 ~~~
 
 ### Option 4: Run from Source (Developers)
@@ -66,8 +62,6 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python -m spg
 ~~~
-
----
 
 ## 💾 Backup & Restore Workflow
 
@@ -83,9 +77,12 @@ Moving your data between computers has never been easier:
 
 ## 🛡️ Security & Privacy
 
-- **Master Password:** Protects access to the application. Cannot be recovered if lost.
+- **True Master Password:** Your master password is used to derive the encryption key using `scrypt`. Without it, your data is mathematically inaccessible.
+- **Strict File Permissions:** Saved data is protected with `0600` permissions on Unix systems.
 - **Local Storage:** All data is stored locally in `~/.spg/` and is encrypted at rest.
 - **No Telemetry:** We don't collect any data.
+
+> **Important Migration Note:** If you used version 0.9.3 or older, you cannot open your old data directly with v1.0.0. Please export a backup from the old version, upgrade, and import it back.
 
 ---
 

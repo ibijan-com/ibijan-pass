@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.0.0] - 2024-10-27
+
+### 🔒 MAJOR SECURITY UPGRADE
+- **True Master Password Architecture:** Implemented `scrypt` KDF. The master password now actually protects the encryption keys. An attacker with access to your files cannot decrypt them without the master password.
+- **Secure Portable Backups:** Backup files (.ibpass) are now encrypted using `scrypt` and a unique salt, making them highly resistant to brute-force attacks.
+- **File System Permissions:** Sensitive files in `~/.spg` now have strict `0600` permissions (Linux/macOS).
+- **Atomic File Writes:** Data is written to temporary files first to prevent corruption during unexpected crashes.
+- **Data Loss Prevention:** The application will now refuse to overwrite or reset data if the encryption key is missing or corrupted.
+
+### ⚠️ Breaking Changes
+- Due to the new KDF architecture, this version cannot read files created by versions 0.9.3 and older. Users must perform a Factory Reset and restore their data using a `.ibpass` backup file.
+
+...
 ## [v0.9.3] - 2026-10-27
 
 ### ✨ Added
