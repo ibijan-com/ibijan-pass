@@ -1,25 +1,25 @@
 # Changelog
 
-## [v1.0.0] - 2024-10-27
+## [v1.0.0] - 2026-10-27
 
-### 🔒 MAJOR SECURITY UPGRADE
+###  MAJOR SECURITY UPGRADE
 - **True Master Password Architecture:** Implemented `scrypt` KDF. The master password now actually protects the encryption keys. An attacker with access to your files cannot decrypt them without the master password.
 - **Secure Portable Backups:** Backup files (.ibpass) are now encrypted using `scrypt` and a unique salt, making them highly resistant to brute-force attacks.
 - **File System Permissions:** Sensitive files in `~/.spg` now have strict `0600` permissions (Linux/macOS).
 - **Atomic File Writes:** Data is written to temporary files first to prevent corruption during unexpected crashes.
 - **Data Loss Prevention:** The application will now refuse to overwrite or reset data if the encryption key is missing or corrupted.
 
-### ⚠️ Breaking Changes
+###  Breaking Changes
 - Due to the new KDF architecture, this version cannot read files created by versions 0.9.3 and older. Users must perform a Factory Reset and restore their data using a `.ibpass` backup file.
 
 ...
 ## [v0.9.3] - 2026-10-27
 
-### ✨ Added
+###  Added
 - **New Branding Tagline:** Updated the UI to reflect "Memorable Password Generation" and "A personal-pattern approach".
 - **Updated Title Bar:** The main window title now dynamically shows the new tagline.
 
-### 💅 UI/UX Improvements
+### UI/UX Improvements
 - Changed the default backup file extension from `.spg` to `.ibpass` to align with the branding.
 - Updated README and installation instructions for the new version.
 
@@ -27,15 +27,15 @@
 
 ## [v0.9.2] - 2026-10-26
 
-### ✨ Added
+### Added
 - **Portable Backups:** Replaced complex encryption keys with an optional backup password. Backup files can now be imported on ANY computer, even after a Factory Reset.
 - **Auto-Load Profile:** The application now automatically loads the first profile immediately after a successful import.
 
-### 🐛 Fixed
+### Fixed
 - Fixed an issue where the Vault encryption key would mismatch after importing a backup from another system.
 - Fixed custom error dialogs to prevent them from being resizable.
 - Fixed the application to automatically restart after performing a Factory Reset.
 - Fixed YAML syntax error in GitHub Actions workflow.
 
-### 💅 UI/UX Improvements
+### UI/UX Improvements
 - Added clearer error messages for invalid backup passwords.

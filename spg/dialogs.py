@@ -246,6 +246,6 @@ def show_about_dialog(root):
     gh_link.bind("<Button-1>", lambda e: open_url("https://github.com/ibijan-com/ibijan-pass"))
 
     tk.Label(about_window, text="License: MIT", font=("Helvetica", 9), fg="gray").pack(pady=(10, 5))
-    tk.Label(about_window, text="© 2024 IbiJan", font=("Helvetica", 9), fg="gray").pack()
+    tk.Label(about_window, text="© 2026 iBijan", font=("Helvetica", 9), fg="gray").pack()
 
     tk.Button(about_window, text="Close", command=about_window.destroy, bg="#CC3333", fg="white", width=10, font=("Helvetica", 10, "bold")).pack(side="bottom", pady=15)

@@ -1,17 +1,17 @@
-# 🔐 iBijan Pass
+# iBijan Pass
 **Memorable Password Generation**  
 *A personal-pattern approach to generating memorable passwords.*
 
 iBijan Pass is a secure, offline desktop application that generates highly customizable passwords based on your own patterns. It features a built-in encrypted vault and a profile management system to keep your accounts safe without relying on cloud services.
 
-🌐 **Website:** [ibijan.com](https://ibijan.com)  
-🐙 **Repository:** [github.com/ibijan-com/ibijan-pass](https://github.com/ibijan-com/ibijan-pass)
+**Website:** [ibijan.com](https://ibijan.com)  
+**Repository:** [github.com/ibijan-com/ibijan-pass](https://github.com/ibijan-com/ibijan-pass)
 
 > **Note:** Currently, official pre-built packages are provided for **Linux** (AppImage, DEB, RPM). Windows and macOS support is planned for future releases.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Custom Generation Patterns:** Define exactly how your password is constructed using Prefixes, Base Numbers, Special Characters, and specific patterns.
 - **Portable Backup & Restore:** Export your data (Profiles and Vault) into a single `.ibpass` file. You can protect it with a custom password and restore it on **any computer**, even after a factory reset.
@@ -23,12 +23,12 @@ iBijan Pass is a secure, offline desktop application that generates highly custo
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 *(You can add your application screenshots here later)*
 
 ---
 
-## 🚀 Installation (Linux)
+## Installation (Linux)
 
 You can download the latest packages from the [Releases](https://github.com/ibijan-com/ibijan-pass/releases) page.
 
@@ -63,7 +63,7 @@ pip install -r requirements.txt
 python -m spg
 ~~~
 
-## 💾 Backup & Restore Workflow
+## Backup & Restore Workflow
 
 Moving your data between computers has never been easier:
 
@@ -75,7 +75,7 @@ Moving your data between computers has never been easier:
 
 ---
 
-## 🛡️ Security & Privacy
+## Security & Privacy
 
 - **True Master Password:** Your master password is used to derive the encryption key using `scrypt`. Without it, your data is mathematically inaccessible.
 - **Strict File Permissions:** Saved data is protected with `0600` permissions on Unix systems.
@@ -86,8 +86,8 @@ Moving your data between computers has never been easier:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request or open an Issue.
 
-## 📄 License
+##  License
 This project is licensed under the MIT License.
