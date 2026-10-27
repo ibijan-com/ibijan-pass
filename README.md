@@ -35,20 +35,20 @@ You can download the latest packages from the [Releases](https://github.com/ibij
 ### Option 1: AppImage (Recommended for all distros)
 ~~~bash
 # Download the AppImage
-chmod +x ibijan-pass-1.0.1-x86_64.AppImage
-./ibijan-pass-1.0.1-x86_64.AppImage
+chmod +x ibijan-pass-1.0.2-x86_64.AppImage
+./ibijan-pass-1.0.2-x86_64.AppImage
 ~~~
 
 ### Option 2: DEB Package (Ubuntu / Debian / Kali)
 ~~~bash
 # Download the .deb file, then run:
-sudo apt install ./ibijan-pass_1.0.1_amd64.deb
+sudo apt install ./ibijan-pass_1.0.2_amd64.deb
 ~~~
 
 ### Option 3: RPM Package (Fedora / CentOS / RHEL)
 ~~~bash
 # Download the .rpm file, then run:
-sudo rpm -i ibijan-pass-1.0.1-1.x86_64.rpm
+sudo rpm -i ibijan-pass-1.0.2-1.x86_64.rpm
 ~~~
 
 ### Option 4: Run from Source (Developers)

@@ -14,7 +14,7 @@ from .validators import (
 )
 from .storage import (
     data_manager, save_profile, delete_profile, load_profile,
-    save_to_vault, get_vault_data, clear_vault, delete_from_vault # Added delete_from_vault
+    save_to_vault, get_vault_data, clear_vault, delete_from_vault
 )
 from .generator import build_password
 from .dialogs import (
@@ -66,7 +66,7 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
-        self.root.minsize(650, 820)
+        self.root.minsize(650, 850)
         self.root.configure(bg="#FFFFFF")
         
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -187,20 +187,25 @@ class SPGApp:
         ttk.Button(header_frame, text="💡 About", style="Primary.TButton", command=lambda: show_about_dialog(self.root)).pack(side="right", padx=5)
         ttk.Button(header_frame, text="📚 Help Guide", style="Primary.TButton", command=lambda: show_comprehensive_help(self.root)).pack(side="right")
 
-        profile_frame = tk.LabelFrame(main_frame, text=" 📁 Password Profiles ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        profile_frame.pack(fill="x", pady=(0, 15))
+        # Renamed to Saved Patterns
+        profile_frame = tk.LabelFrame(main_frame, text=" 📁 Saved Patterns ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        profile_frame.pack(fill="x", pady=(0, 5))
 
-        tk.Label(profile_frame, text="Select:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10)
+        tk.Label(profile_frame, text="Select Pattern:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10)
         self.profile_var = tk.StringVar()
         self.profile_combo = ttk.Combobox(profile_frame, textvariable=self.profile_var, width=30, state="readonly")
         self.profile_combo.grid(row=0, column=1, padx=5, pady=10)
         self.update_profile_combo()
         
-        btn_load = ttk.Button(profile_frame, text="📥 Load", style="Primary.TButton", command=self.load_selected_profile)
+        btn_load = ttk.Button(profile_frame, text="📥 Load Pattern", style="Primary.TButton", command=self.load_selected_profile)
         btn_load.grid(row=0, column=2, padx=2)
-        ToolTip(btn_load, "Load the selected profile from the dropdown menu.")
+        ToolTip(btn_load, "Load the selected pattern to quickly generate a new password.")
 
-        ttk.Button(profile_frame, text="🗑️ Delete", style="Danger.TButton", command=self.delete_selected_profile).grid(row=0, column=3, padx=2)
+        ttk.Button(profile_frame, text="🗑️ Delete Pattern", style="Danger.TButton", command=self.delete_selected_profile).grid(row=0, column=3, padx=2)
+
+        # Hint text
+        hint_label = tk.Label(main_frame, text="Hint: Save your base components as a Pattern. Load it, then just change the Service Name for each new service.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF")
+        hint_label.pack(fill="x", pady=(0, 10))
 
         settings_frame = tk.LabelFrame(main_frame, text=" 🔧 Password Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         settings_frame.pack(fill="x", pady=(0, 15))
@@ -211,13 +216,14 @@ class SPGApp:
         vcmd_svc = (self.root.register(validate_service_name), '%P')
         vcmd_cap = (self.root.register(validate_capitalize_letter), '%P')
 
-        tk.Label(settings_frame, text="New Profile Name:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.profile_name_entry = PlaceholderEntry(settings_frame, placeholder="e.g., MyBank", width=25)
+        # Renamed to Pattern Name
+        tk.Label(settings_frame, text="Pattern Name:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        self.profile_name_entry = PlaceholderEntry(settings_frame, placeholder="e.g., MyBasePattern", width=25)
         self.profile_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
-        ttk.Button(settings_frame, text="💾 Save As New", style="Success.TButton", command=self.save_current_profile).grid(row=0, column=2, padx=10)
+        ttk.Button(settings_frame, text="💾 Save Pattern", style="Success.TButton", command=self.save_current_profile).grid(row=0, column=2, padx=10)
 
         self.require_master_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(settings_frame, text="🔒 Require Master Password to load this profile", variable=self.require_master_var, bg="#FFFFFF").grid(row=1, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+        tk.Checkbutton(settings_frame, text="🔒 Require Master Password to load this pattern", variable=self.require_master_var, bg="#FFFFFF").grid(row=1, column=0, columnspan=3, sticky="w", padx=5, pady=5)
 
         tk.Label(settings_frame, text="Prefix:", bg="#FFFFFF").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.prefix_entry = PlaceholderEntry(settings_frame, placeholder="e.g., London", width=25, validate="key", validatecommand=vcmd_pref)
@@ -254,7 +260,10 @@ class SPGApp:
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
         ttk.Button(action_frame, text="💾 Save to Vault", style="Success.TButton", command=self.save_to_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
-        ttk.Button(action_frame, text="🧹 Clear", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=15)
+        
+        # New Clear Service Button
+        ttk.Button(action_frame, text="🧹 Clear Service", style="Neutral.TButton", command=self.clear_service).pack(side="left", padx=5)
+        ttk.Button(action_frame, text="🧹 Clear All", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=5)
 
         data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         data_frame.pack(fill="x", pady=10)
@@ -285,8 +294,8 @@ class SPGApp:
             if display_names:
                 self.profile_combo.current(0)
         except Exception as e:
-            messagebox.showerror("Data Error", f"Could not load profiles:\n{e}\n\nSaving is disabled to prevent data loss.", parent=self.root)
-            self.profile_combo['values'] = ["⚠️ ERROR: Profiles Corrupted"]
+            messagebox.showerror("Data Error", f"Could not load patterns:\n{e}\n\nSaving is disabled to prevent data loss.", parent=self.root)
+            self.profile_combo['values'] = ["⚠️ ERROR: Corrupted"]
 
     def after_import_callback(self):
         self.update_profile_combo()
@@ -299,9 +308,9 @@ class SPGApp:
         
         if not display_name:
             if not profiles:
-                messagebox.showinfo("No Profiles", "You haven't saved any profiles yet.\n\nPlease fill out the settings and click 'Save As New' first.", parent=self.root)
+                messagebox.showinfo("No Patterns", "You haven't saved any patterns yet.\n\nPlease fill out the settings and click 'Save Pattern' first.", parent=self.root)
             else:
-                messagebox.showwarning("Select a Profile", "Please select a profile from the dropdown menu first, then click Load.", parent=self.root)
+                messagebox.showwarning("Select a Pattern", "Please select a pattern from the dropdown menu first, then click Load.", parent=self.root)
             return
             
         profile_name = display_name.replace("🔒 ", "").replace("📁 ", "")
@@ -321,10 +330,10 @@ class SPGApp:
             self.pattern_var.set(profile_data.get("password_pattern", DEFAULT_PATTERN))
             
             if show_msg:
-                messagebox.showinfo("Loaded", f"Profile '{profile_name}' loaded.", parent=self.root)
+                messagebox.showinfo("Loaded", f"Pattern '{profile_name}' loaded. You can now change the Service Name.", parent=self.root)
                 
     def save_current_profile(self):
-        name = self.profile_name_entry.get_value().strip() or f"Profile_{len(data_manager.get_profiles()) + 1}"
+        name = self.profile_name_entry.get_value().strip() or f"Pattern_{len(data_manager.get_profiles()) + 1}"
         success, msg = save_profile(
             name, self.prefix_entry.get_value(), self.base_entry.get_value(), self.special_entry.get_value(),
             self.capitalize_entry.get_value(), self.pattern_var.get(),
@@ -341,7 +350,7 @@ class SPGApp:
         display_name = self.profile_var.get()
         if not display_name: return
         name = display_name.replace("🔒 ", "").replace("📁 ", "")
-        if messagebox.askyesno("Confirm", f"Delete profile '{name}'?", parent=self.root):
+        if messagebox.askyesno("Confirm", f"Delete pattern '{name}'?", parent=self.root):
             if delete_profile(name):
                 self.update_profile_combo()
                 self.profile_var.set("")
@@ -386,7 +395,16 @@ class SPGApp:
         else:
             messagebox.showerror("Error", msg, parent=self.root)
 
+    def clear_service(self):
+        """Clears only the service name field so the user can type a new website."""
+        self.service_entry._clear_placeholder()
+        self.service_entry.delete(0, tk.END)
+        self.service_entry._add_placeholder()
+        self.last_generated_password = ""
+        self.service_entry.focus()
+
     def clear_inputs(self):
+        """Clears all input fields and resets the form."""
         for entry in [self.profile_name_entry, self.prefix_entry, self.base_entry, 
                       self.special_entry, self.service_entry, self.capitalize_entry, self.note_entry]:
             entry._clear_placeholder()
@@ -413,7 +431,6 @@ class SPGApp:
         tree_scroll = ttk.Scrollbar(tree_frame)
         tree_scroll.pack(side="right", fill="y")
         
-        # selectmode="extended" allows selecting multiple items (Ctrl+Click or Shift+Click)
         tree = ttk.Treeview(tree_frame, columns=("Service", "Password", "Note"), show="headings", selectmode="extended", yscrollcommand=tree_scroll.set)
         tree_scroll.config(command=tree.yview)
         
@@ -426,22 +443,18 @@ class SPGApp:
         tree.column("Note", width=250)
 
         def refresh_tree():
-            # Clear existing items
             for item in tree.get_children():
                 tree.delete(item)
-            # Reload from storage
             new_data = get_vault_data()
             if new_data:
                 for row in new_data:
                     tree.insert("", "end", values=row)
 
-        # Populate initial data
         for row in vault_data:
             tree.insert("", "end", values=row)
             
         tree.pack(fill="both", expand=True)
 
-        # Ctrl+A binding for Treeview
         def select_all(event=None):
             tree.selection_set(tree.get_children())
             return "break"
@@ -454,7 +467,6 @@ class SPGApp:
             if not selected:
                 messagebox.showinfo("Copy", "Please select a row first.", parent=vw)
                 return
-            # If multiple selected, copy the first one's password
             item = tree.item(selected[0])
             password = item['values'][1]
             clipboard_manager.copy_to_clipboard(password)
@@ -481,11 +493,10 @@ class SPGApp:
                 messagebox.showinfo("Success", msg, parent=vw)
                 refresh_tree()
                 if not tree.get_children():
-                    vw.destroy() # Close window if vault becomes empty
+                    vw.destroy()
             else:
                 messagebox.showerror("Error", msg, parent=vw)
 
-        # Action buttons at the bottom
         btn_frame = tk.Frame(vw)
         btn_frame.pack(pady=10)
         

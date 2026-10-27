@@ -146,7 +146,7 @@ def show_export_dialog(root):
     pw_entry = tk.Entry(export_window, width=40, show="*")
     pw_entry.pack(pady=2)
     
-    warning_lbl = tk.Label(export_window, text="You MUST remember this password to import this file later.", font=("Helvetica", 8), fg="#CC3333")
+    warning_lbl = tk.Label(export_window, text="You MUST remember this password to import this file later.", font=("Helvetica", 8, "bold"), fg="#CC3333")
     warning_lbl.pack(pady=5)
     
     def perform_export():

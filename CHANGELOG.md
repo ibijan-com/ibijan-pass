@@ -1,5 +1,23 @@
 # Changelog
 
+## [v1.0.2] - 2026-10-28
+
+### Added
+- **Clear Service Button:** Added a dedicated button to clear only the "Service Name" field. This allows users to keep their mental pattern loaded while quickly generating a password for a new website.
+
+### Changed
+- **Mental Patterns Concept:** Renamed "Profiles" to "Saved Patterns" across the UI to better align with the core philosophy of the application (saving base components rather than site-specific profiles).
+- **Save Button:** Renamed "Save As New" to "Save Pattern" for consistency.
+
+### UI/UX Improvements
+- Added an instructional hint text below the pattern selection area to guide users on how to use saved patterns for new services.
+- Increased the font size of the hint text for better readability.
+
+---
+
+## [v1.0.1] - 2026-10-27
+...
+
 ## [v1.0.1] - 2026-10-27
 
 ### Added
