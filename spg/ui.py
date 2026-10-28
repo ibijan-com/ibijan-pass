@@ -7,7 +7,7 @@ from .config import (
     APP_VERSION, APP_WEBSITE, CONFIG_DIR, PASSWORD_PATTERNS, DEFAULT_PATTERN,
     BRAND_PRIMARY, BRAND_DARK, COLOR_SUCCESS, COLOR_DANGER, COLOR_NEUTRAL
 )
-from .crypto import is_master_set, setup_master_password, verify_master_password, get_fernet, KeyIntegrityError
+from .crypto import is_master_set, setup_master_password, verify_master_password, get_fernet, KeyIntegrityError, lock_fernet
 from .validators import (
     validate_prefix, validate_base_number, validate_special_chars,
     validate_service_name, validate_capitalize_letter, validate_profile_name
@@ -66,7 +66,7 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
-        self.root.minsize(650, 850)
+        self.root.minsize(680, 850)
         self.root.configure(bg="#FFFFFF")
         
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -85,7 +85,12 @@ class SPGApp:
         self.root.bind_class("TEntry", "<Control-a>", self._select_all)
         self.root.bind_class("TEntry", "<Control-A>", self._select_all)
 
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.check_authentication()
+
+    def on_closing(self):
+        lock_fernet()
+        self.root.destroy()
 
     def _select_all(self, event):
         event.widget.select_range(0, 'end')
@@ -114,10 +119,14 @@ class SPGApp:
 
     def check_authentication(self):
         self.clear_screen()
-        if is_master_set():
-            self.show_login_screen()
-        else:
-            self.show_setup_screen()
+        try:
+            if is_master_set():
+                self.show_login_screen()
+            else:
+                self.show_setup_screen()
+        except KeyIntegrityError as e:
+            messagebox.showerror("Critical Security Error", str(e), parent=self.root)
+            self.root.destroy()
 
     def show_login_screen(self):
         tk.Label(self.root, text="🔐 iBijan Pass", font=("Helvetica", 24, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").pack(pady=(80, 5))
@@ -187,7 +196,6 @@ class SPGApp:
         ttk.Button(header_frame, text="💡 About", style="Primary.TButton", command=lambda: show_about_dialog(self.root)).pack(side="right", padx=5)
         ttk.Button(header_frame, text="📚 Help Guide", style="Primary.TButton", command=lambda: show_comprehensive_help(self.root)).pack(side="right")
 
-        # Renamed to Saved Patterns
         profile_frame = tk.LabelFrame(main_frame, text=" 📁 Saved Patterns ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         profile_frame.pack(fill="x", pady=(0, 5))
 
@@ -203,7 +211,6 @@ class SPGApp:
 
         ttk.Button(profile_frame, text="🗑️ Delete Pattern", style="Danger.TButton", command=self.delete_selected_profile).grid(row=0, column=3, padx=2)
 
-        # Hint text
         hint_label = tk.Label(main_frame, text="Hint: Save your base components as a Pattern. Load it, then just change the Service Name for each new service.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF")
         hint_label.pack(fill="x", pady=(0, 10))
 
@@ -216,7 +223,6 @@ class SPGApp:
         vcmd_svc = (self.root.register(validate_service_name), '%P')
         vcmd_cap = (self.root.register(validate_capitalize_letter), '%P')
 
-        # Renamed to Pattern Name
         tk.Label(settings_frame, text="Pattern Name:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.profile_name_entry = PlaceholderEntry(settings_frame, placeholder="e.g., MyBasePattern", width=25)
         self.profile_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
@@ -257,12 +263,10 @@ class SPGApp:
         action_frame = tk.Frame(main_frame, bg="#FFFFFF")
         action_frame.pack(fill="x", pady=10)
 
-        ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
+        ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 5), ipadx=5, ipady=5)
         ttk.Button(action_frame, text="💾 Save to Vault", style="Success.TButton", command=self.save_to_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
-        
-        # New Clear Service Button
-        ttk.Button(action_frame, text="🧹 Clear Service", style="Neutral.TButton", command=self.clear_service).pack(side="left", padx=5)
+        ttk.Button(action_frame, text="👁️ Preview All", style="Primary.TButton", command=self.show_preview_all_dialog).pack(side="left", padx=5)
         ttk.Button(action_frame, text="🧹 Clear All", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=5)
 
         data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
@@ -395,16 +399,97 @@ class SPGApp:
         else:
             messagebox.showerror("Error", msg, parent=self.root)
 
-    def clear_service(self):
-        """Clears only the service name field so the user can type a new website."""
-        self.service_entry._clear_placeholder()
-        self.service_entry.delete(0, tk.END)
-        self.service_entry._add_placeholder()
-        self.last_generated_password = ""
-        self.service_entry.focus()
+    def show_preview_all_dialog(self):
+        prefix = self.prefix_entry.get_value()
+        base_number = self.base_entry.get_value()
+        special_chars = self.special_entry.get_value()
+        service_name = self.service_entry.get_value()
+        user_letter = self.capitalize_entry.get_value()
+
+        if not all([prefix, base_number, special_chars, service_name]):
+            messagebox.showerror("Error", "Please fill in all required fields (Prefix, Base, Special, Service) to preview patterns.", parent=self.root)
+            return
+
+        preview_window = tk.Toplevel(self.root)
+        preview_window.title("Preview All Patterns")
+        preview_window.geometry("950x480") 
+        preview_window.transient(self.root)
+        preview_window.grab_set()
+        preview_window.resizable(False, False)
+
+        bottom_btn_frame = tk.Frame(preview_window)
+        bottom_btn_frame.pack(side="bottom", fill="x", pady=15)
+        ttk.Button(bottom_btn_frame, text="Close", style="Danger.TButton", command=preview_window.destroy).pack()
+
+        tk.Label(preview_window, text="👁️ Preview All Password Patterns", font=("Helvetica", 14, "bold"), fg=BRAND_PRIMARY).pack(pady=(10, 5))
+        tk.Label(preview_window, text="Pick your favorite pattern, copy it, or give it a name to save.", font=("Helvetica", 9), fg=COLOR_NEUTRAL).pack(pady=(0, 10))
+
+        header_frame = tk.Frame(preview_window)
+        header_frame.pack(fill="x", padx=20, pady=5)
+        tk.Label(header_frame, text="Pattern Layout", font=("Helvetica", 10, "bold"), width=38, anchor="w").pack(side="left")
+        tk.Label(header_frame, text="Generated Password", font=("Helvetica", 10, "bold"), width=22, anchor="w").pack(side="left")
+        tk.Label(header_frame, text="Pattern Name", font=("Helvetica", 10, "bold"), width=18, anchor="w").pack(side="left")
+        tk.Label(header_frame, text="Actions", font=("Helvetica", 10, "bold"), width=15, anchor="w").pack(side="left")
+
+        ttk.Separator(preview_window, orient='horizontal').pack(fill='x', padx=20, pady=5)
+
+        list_frame = tk.Frame(preview_window, bg="#FFFFFF")
+        list_frame.pack(fill="both", expand=True, padx=20, pady=5)
+
+        def copy_specific_pw(pw):
+            if clipboard_manager.copy_to_clipboard(pw):
+                messagebox.showinfo("Copied", "Password copied to clipboard!", parent=preview_window)
+
+        def save_specific_pattern(pattern_key, entry_widget):
+            name = entry_widget.get_value().strip()
+            if not name:
+                messagebox.showerror("Error", "Please enter a name for this pattern.", parent=preview_window)
+                return
+            
+            if name in data_manager.get_profiles():
+                messagebox.showerror("Error", f"A pattern named '{name}' already exists. Please choose another name.", parent=preview_window)
+                return
+
+            success, msg = save_profile(
+                name, prefix, base_number, special_chars, 
+                user_letter, pattern_key, False 
+            )
+            
+            if success:
+                messagebox.showinfo("Saved", f"Pattern '{name}' saved successfully!", parent=preview_window)
+                entry_widget._clear_placeholder()
+                entry_widget.delete(0, tk.END)
+                entry_widget._add_placeholder()
+                self.update_profile_combo()
+            else:
+                messagebox.showerror("Error", msg, parent=preview_window)
+
+        for pattern_key in PASSWORD_PATTERNS.keys():
+            pw, warning = build_password(prefix, base_number, special_chars, service_name, user_letter, pattern_key)
+            
+            row_frame = tk.Frame(list_frame, bg="#FFFFFF")
+            row_frame.pack(fill="x", pady=5)
+
+            tk.Label(row_frame, text=pattern_key, width=38, anchor="w", bg="#FFFFFF", font=("Helvetica", 9)).pack(side="left")
+            tk.Label(row_frame, text=pw, width=22, anchor="w", bg="#FFFFFF", font=("Helvetica", 10, "bold"), fg=COLOR_SUCCESS).pack(side="left")
+            
+            name_entry = PlaceholderEntry(row_frame, placeholder="e.g., MyPattern", width=18)
+            name_entry.pack(side="left", padx=5)
+            
+            action_frame = tk.Frame(row_frame, bg="#FFFFFF")
+            action_frame.pack(side="left", padx=5)
+
+            ttk.Button(
+                action_frame, text="📋 Copy", style="Primary.TButton", 
+                command=lambda p=pw: copy_specific_pw(p)
+            ).pack(side="left", padx=(0, 5))
+
+            ttk.Button(
+                action_frame, text="💾 Save", style="Success.TButton", 
+                command=lambda k=pattern_key, e=name_entry: save_specific_pattern(k, e)
+            ).pack(side="left")
 
     def clear_inputs(self):
-        """Clears all input fields and resets the form."""
         for entry in [self.profile_name_entry, self.prefix_entry, self.base_entry, 
                       self.special_entry, self.service_entry, self.capitalize_entry, self.note_entry]:
             entry._clear_placeholder()

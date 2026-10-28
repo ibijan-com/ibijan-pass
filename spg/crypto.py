@@ -3,9 +3,12 @@ import json
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from .config import CONFIG_DIR, KEY_FILE, MASTER_HASH_FILE, PROFILES_FILE, VAULT_FILE
+from .config import CONFIG_DIR, KEY_FILE, PROFILES_FILE, VAULT_FILE
 
 class KeyIntegrityError(Exception):
+    pass
+
+class DataMissingError(Exception):
     pass
 
 _fernet_instance = None
@@ -19,28 +22,49 @@ def get_fernet() -> Fernet:
         raise KeyIntegrityError("Data key not loaded. Please authenticate first.")
     return _fernet_instance
 
+def lock_fernet():
+    """Removes the active data key from memory."""
+    global _fernet_instance
+    _fernet_instance = None
+
 def _derive_key(password: str, salt: bytes) -> bytes:
     """Derive a 32-byte key using scrypt."""
     kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def is_master_set() -> bool:
-    return os.path.exists(KEY_FILE)
+    """Check if the Master Password is set, preventing the 'New Install' trap."""
+    key_exists = os.path.exists(KEY_FILE)
+    data_exists = os.path.exists(PROFILES_FILE) or os.path.exists(VAULT_FILE)
+
+    if not key_exists and data_exists:
+        raise KeyIntegrityError(
+            "CRITICAL SECURITY ERROR:\n\n"
+            "The encryption key (key.key) is missing, but encrypted data exists.\n"
+            "The application cannot access your data without the key.\n\n"
+            "If you have a .ibpass backup file, please use Factory Reset, then Import your backup."
+        )
+    
+    return key_exists
 
 def setup_master_password(password: str):
     """Creates the master key file, generating a random data key and encrypting it."""
+    if not password:
+        raise ValueError("Password cannot be empty.")
+
     if os.path.exists(KEY_FILE):
         raise ValueError("Master password is already set.")
 
+    if os.path.exists(PROFILES_FILE) or os.path.exists(VAULT_FILE):
+        raise ValueError("Data files exist but key is missing. Factory Reset is required.")
+
     os.makedirs(CONFIG_DIR, exist_ok=True)
-    # Set directory permissions to 0700 (only owner can read/write/execute)
     if os.name == 'posix':
         os.chmod(CONFIG_DIR, 0o700)
 
     salt = os.urandom(16)
     master_key = _derive_key(password, salt)
     
-    # Generate a random Data Key for actual encryption
     data_key = Fernet.generate_key()
     f_master = Fernet(master_key)
     encrypted_data_key = f_master.encrypt(data_key)
@@ -55,16 +79,8 @@ def setup_master_password(password: str):
         json.dump(key_payload, f)
     
     if os.name == 'posix':
-        os.chmod(KEY_FILE, 0o600) # Only owner can read/write
+        os.chmod(KEY_FILE, 0o600)
 
-    # Also save the hash for quick UI checks (optional, but good for UX)
-    import hashlib
-    with open(MASTER_HASH_FILE, "w") as f:
-        f.write(hashlib.sha256(password.encode()).hexdigest())
-    if os.name == 'posix':
-        os.chmod(MASTER_HASH_FILE, 0o600)
-
-    # Load it into memory
     set_fernet(Fernet(data_key))
 
 def verify_master_password(password: str) -> bool:
@@ -76,9 +92,8 @@ def verify_master_password(password: str) -> bool:
         with open(KEY_FILE, "r") as f:
             key_payload = json.load(f)
         
-        # Handle old format (raw key)
         if "encrypted_data_key" not in key_payload:
-            raise KeyIntegrityError("Incompatible old key format. Please perform a Factory Reset.")
+            raise KeyIntegrityError("Incompatible key format. Factory Reset required.")
 
         salt = base64.b64decode(key_payload["salt"])
         encrypted_data_key = key_payload["encrypted_data_key"].encode('utf-8')
@@ -86,12 +101,9 @@ def verify_master_password(password: str) -> bool:
         master_key = _derive_key(password, salt)
         f_master = Fernet(master_key)
         
-        # This will raise InvalidToken if the password is wrong
         data_key = f_master.decrypt(encrypted_data_key)
-        
         set_fernet(Fernet(data_key))
         return True
 
     except Exception:
-        # Do not reveal whether it was a JSON error or wrong password
         return False
