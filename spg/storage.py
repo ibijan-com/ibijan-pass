@@ -2,6 +2,7 @@ import os
 import json
 import csv
 import io
+import tempfile
 from cryptography.fernet import InvalidToken
 from .config import PROFILES_FILE, VAULT_FILE
 from .crypto import get_fernet
@@ -36,6 +37,35 @@ class DataManager:
 data_manager = DataManager()
 
 # ============================================================
+# SECURE ATOMIC FILE WRITER
+# ============================================================
+def safe_write_file(dest_path: str, data: bytes):
+    """Writes data to a temporary file and atomically replaces the destination."""
+    dir_name = os.path.dirname(dest_path)
+    os.makedirs(dir_name, exist_ok=True)
+    
+    # Create a secure, unpredictable temp file in the same directory
+    fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix=".tmp_", text=False)
+    
+    try:
+        with os.fdopen(fd, 'wb') as tmp_file:
+            tmp_file.write(data)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())  # Force write to disk
+            
+        # Set strict permissions on the temp file before moving it
+        if os.name == 'posix':
+            os.chmod(temp_path, 0o600)
+            
+        # Atomically replace the destination file
+        os.replace(temp_path, dest_path)
+    except Exception as e:
+        # If anything fails, ensure the temp file is deleted
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise e
+
+# ============================================================
 # Profile CRUD
 # ============================================================
 def save_profile(profile_name, prefix, base_number, special_chars,
@@ -48,7 +78,6 @@ def save_profile(profile_name, prefix, base_number, special_chars,
     if profile_name in profiles:
         return False, "Profile name already exists!"
 
-    # Create a copy to avoid modifying the cache if disk write fails
     new_profiles = profiles.copy()
     new_profiles[profile_name] = {
         "prefix": prefix,
@@ -61,10 +90,7 @@ def save_profile(profile_name, prefix, base_number, special_chars,
 
     try:
         encrypted = get_fernet().encrypt(json.dumps(new_profiles).encode())
-        with open(PROFILES_FILE, "wb") as f:
-            f.write(encrypted)
-        if os.name == 'posix':
-            os.chmod(PROFILES_FILE, 0o600)
+        safe_write_file(PROFILES_FILE, encrypted)
         data_manager.invalidate_cache()
         return True, f"Profile '{profile_name}' saved successfully!"
     except Exception as e:
@@ -78,8 +104,7 @@ def delete_profile(profile_name: str) -> bool:
         del new_profiles[profile_name]
         try:
             encrypted = get_fernet().encrypt(json.dumps(new_profiles).encode())
-            with open(PROFILES_FILE, "wb") as f:
-                f.write(encrypted)
+            safe_write_file(PROFILES_FILE, encrypted)
             data_manager.invalidate_cache()
             return True
         except Exception as e:
@@ -106,10 +131,7 @@ def save_to_vault(service: str, password: str, note: str = "") -> tuple[bool, st
             next(reader, None) 
             for row in reader:
                 if len(row) >= 2:
-                    svc = row[0]
-                    pw = row[1]
-                    nt = row[2] if len(row) > 2 else ""
-                    data.append((svc, pw, nt))
+                    data.append((row[0], row[1], row[2] if len(row) > 2 else ""))
         except InvalidToken:
             return False, "Vault encryption key mismatch. The Vault file is corrupted."
         except Exception as e:
@@ -127,10 +149,7 @@ def save_to_vault(service: str, password: str, note: str = "") -> tuple[bool, st
     
     try:
         encrypted = get_fernet().encrypt(output.getvalue().encode())
-        with open(VAULT_FILE, "wb") as f:
-            f.write(encrypted)
-        if os.name == 'posix':
-            os.chmod(VAULT_FILE, 0o600)
+        safe_write_file(VAULT_FILE, encrypted)
         return True, f"Password for '{service}' saved securely."
     except Exception as e:
         return False, f"Failed to save to vault: {e}"
@@ -194,8 +213,7 @@ def delete_from_vault(entries_to_delete: list[tuple[str, str]]) -> tuple[bool, s
     
     try:
         encrypted = get_fernet().encrypt(output.getvalue().encode())
-        with open(VAULT_FILE, "wb") as f:
-            f.write(encrypted)
+        safe_write_file(VAULT_FILE, encrypted)
         return True, f"Successfully deleted {original_count - new_count} password(s)."
     except Exception as e:
         return False, f"Failed to update vault: {e}"

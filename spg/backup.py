@@ -8,7 +8,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from .config import VAULT_FILE, PROFILES_FILE
-from .storage import data_manager
+from .storage import data_manager, safe_write_file
 from .dialogs import show_custom_error
 from .crypto import get_fernet
 
@@ -17,8 +17,8 @@ def _derive_backup_key(password: str, salt: bytes) -> bytes:
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
-    temp_path = file_path + ".tmp"
     try:
+        # Do not use .strip() on passwords. Check for empty string only.
         if not password:
             return False, "Export failed: A backup password is required."
 
@@ -37,7 +37,7 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
                 with open(VAULT_FILE, "rb") as f:
                     vault_encrypted = f.read()
                 try:
-                    # MUST NOT SKIP CORRUPTED VAULT
+                    # Must not silently skip a corrupted vault
                     vault_decrypted = get_fernet().decrypt(vault_encrypted).decode()
                     export_payload["data"]["vault_text"] = vault_decrypted
                 except Exception as e:
@@ -46,6 +46,7 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
                 if export_type == 'vault':
                     return False, "Export failed: No Vault file exists to export."
         
+        # Encrypt payload with password-derived key
         salt = os.urandom(16)
         key = _derive_backup_key(password, salt)
         f = Fernet(key)
@@ -58,14 +59,14 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
             "payload": encrypted_data.decode('utf-8')
         }
         
-        with open(temp_path, "w") as out_f:
-            json.dump(final_output, out_f)
-        os.replace(temp_path, file_path)
+        final_bytes = json.dumps(final_output).encode('utf-8')
+        
+        # Atomic write using the secure helper from storage.py
+        safe_write_file(file_path, final_bytes)
         
         return True, "Export completed successfully!"
+        
     except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
         return False, f"Export failed: {e}"
 
 def _import_data(file_path, password=None) -> tuple[bool, str]:
@@ -94,24 +95,66 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         imported_profiles = 0
         imported_vault = 0
         
+        # Prepare data in memory before touching the filesystem
+        profiles_to_write = None
+        vault_to_write = None
+        
         if "profiles" in import_payload["data"]:
             current_profiles = data_manager.get_profiles()
+            merged_profiles = current_profiles.copy()
             for name, data in import_payload["data"]["profiles"].items():
-                if name not in current_profiles:
-                    current_profiles[name] = data
+                if name not in merged_profiles:
+                    merged_profiles[name] = data
                     imported_profiles += 1
             
-            encrypted_profiles = get_fernet().encrypt(json.dumps(current_profiles).encode())
-            with open(PROFILES_FILE, "wb") as f:
-                f.write(encrypted_profiles)
-            data_manager.invalidate_cache()
-        
+            profiles_to_write = get_fernet().encrypt(json.dumps(merged_profiles).encode())
+            
         if "vault_text" in import_payload["data"]:
             vault_text = import_payload["data"]["vault_text"]
-            vault_encrypted = get_fernet().encrypt(vault_text.encode())
-            with open(VAULT_FILE, "wb") as f:
-                f.write(vault_encrypted)
+            vault_to_write = get_fernet().encrypt(vault_text.encode())
             imported_vault += 1
+
+        # Transactional File Write
+        temp_prof = PROFILES_FILE + ".tmp_import"
+        temp_vault = VAULT_FILE + ".tmp_import"
+        bak_prof = PROFILES_FILE + ".bak"
+        bak_vault = VAULT_FILE + ".bak"
+        
+        try:
+            # 1. Write to temporary files
+            if profiles_to_write:
+                with open(temp_prof, "wb") as f: f.write(profiles_to_write)
+            if vault_to_write:
+                with open(temp_vault, "wb") as f: f.write(vault_to_write)
+            
+            # 2. Backup existing files
+            if os.path.exists(PROFILES_FILE): os.replace(PROFILES_FILE, bak_prof)
+            if os.path.exists(VAULT_FILE): os.replace(VAULT_FILE, bak_vault)
+
+            # 3. Move new files into place
+            if profiles_to_write: os.replace(temp_prof, PROFILES_FILE)
+            if vault_to_write: os.replace(temp_vault, VAULT_FILE)
+
+            # 4. Success: Clean up backup files
+            if os.path.exists(bak_prof): os.remove(bak_prof)
+            if os.path.exists(bak_vault): os.remove(bak_vault)
+            
+            data_manager.invalidate_cache()
+
+        except Exception as e:
+            # Rollback mechanism on failure
+            if os.path.exists(temp_prof): os.remove(temp_prof)
+            if os.path.exists(temp_vault): os.remove(temp_vault)
+            
+            if os.path.exists(bak_prof):
+                if os.path.exists(PROFILES_FILE): os.remove(PROFILES_FILE)
+                os.replace(bak_prof, PROFILES_FILE)
+                
+            if os.path.exists(bak_vault):
+                if os.path.exists(VAULT_FILE): os.remove(VAULT_FILE)
+                os.replace(bak_vault, VAULT_FILE)
+                
+            return False, f"Import failed during write. Existing data was preserved.\nDetails: {e}"
         
         return True, f"Import completed!\nProfiles restored: {imported_profiles}\nVault items restored: {imported_vault}"
     
