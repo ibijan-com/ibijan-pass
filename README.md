@@ -78,10 +78,10 @@ Moving your data between computers has never been easier:
 ## Security & Privacy
 
 - **True Master Password:** Your master password is used to derive the encryption key using `scrypt`. Without it, your data is mathematically inaccessible.
+- **Atomic Storage:** All data is saved using atomic file replacement to prevent corruption during unexpected crashes.
 - **Strict File Permissions:** Saved data is protected with `0600` permissions on Unix systems.
 - **Local Storage:** All data is stored locally in `~/.spg/` and is encrypted at rest.
 - **No Telemetry:** We don't collect any data.
-
 > **Important Migration Note:** If you used version 0.9.3 or older, you cannot open your old data directly with v1.0.0. Please export a backup from the old version, upgrade, and import it back.
 
 ---

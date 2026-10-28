@@ -1,5 +1,18 @@
 # Changelog
 
+## [v1.1.0] - 2026-10-29
+
+### Major Security & Reliability Overhaul
+- **Atomic File Writes:** The application now writes data to secure temporary files and replaces the original only on success. This prevents data corruption if the app crashes or power is lost.
+- **Transactional Backup Import:** Importing a backup is now a transactional operation. If restoring the vault fails, your existing profiles and vault remain untouched (rollback mechanism).
+- **Independent Input Validation:** Password generation now enforces strict character and length rules internally, preventing corrupted profiles from generating weak or invalid passwords.
+- **Removed Fast SHA-256 Hash:** The Master Password is no longer verified using a fast hash. All authentication now relies on the secure `scrypt` KDF.
+- **Strict Key Requirement:** The app will now refuse to start and will prevent data loss if the encryption key is missing but encrypted data exists.
+
+### Important Notes
+- It is highly recommended to re-export your backups using this new version.
+
+---
 ## [v1.0.2] - 2026-10-28
 
 ### Added
