@@ -16,8 +16,8 @@ def show_comprehensive_help(root):
 
     _help_window = tk.Toplevel(root)
     _help_window.title(f"📚 Guide - iBijan Pass v{APP_VERSION}")
-    _help_window.geometry("750x650")
-    _help_window.minsize(700, 550)
+    _help_window.geometry("800x650")
+    _help_window.minsize(750, 550)
     
     button_frame = tk.Frame(_help_window)
     button_frame.pack(side="bottom", fill="x", pady=10)
@@ -26,37 +26,47 @@ def show_comprehensive_help(root):
     notebook.pack(fill="both", expand=True, padx=10, pady=(10, 0))
     
     tabs = {
-        "🚀 Quick Start": """
+        "🚀 Mental Mode": """
 1. Enter a Prefix (Letters only, e.g., BI).
 2. Enter a Base Number (Numbers only, e.g., 100).
 3. Add Special Characters (e.g., @).
 4. Enter Service Name (e.g., gmail).
-5. (Optional) Enter a Capitalize Letter (e.g., G).
-6. Click "Generate Password".
-
-Your password will be copied to the clipboard automatically!
-Click "Clear" to reset all fields and start over.
+5. (Optional) Enter a Capitalize Letter(s) (up to 3 letters, e.g., G).
+6. Click "Generate".
 
 How the math works (Example: gmail, Base 100, Letter G):
 • Service "gmail" has 5 letters.
-• Capitalize letter: G (The letter you typed, converted to uppercase).
+• Capitalize letter: G.
 • Middle part = Length (5) + Letter (G) = "5G"
 • End number = Base (100) + Length (5) = 105
 • Final Password (Default pattern) = BI + 5G + @ + 105 = BI5G@105
 
-Note: If you leave the Capitalize Letter empty, the password will not have uppercase letters, and you will receive a security warning.
+Note: If you leave the Capitalize Letter empty, the password will not have uppercase letters.
 """,
-        "🎨 Patterns": """
-You can choose how your password is built using components:
+        "🔐 Cryptographic Mode": """
+Cryptographic Mode generates highly secure, random-looking passwords based on a Master Secret and the Service Name. It does NOT save the generated passwords.
+
+How to use:
+1. Enter your Master Secret. (This is different from your Application Master Password. Keep it safe!)
+2. Enter the Service Name (e.g., google) and Account/Username (e.g., user@gmail.com).
+3. Choose your desired Password Length (4 to 128 characters).
+4. Select character types (Uppercase, Lowercase, Digits, Symbols).
+5. Click "Generate".
+
+How it works:
+• The password is generated mathematically using your Master Secret and a unique random "Salt" generated for that specific service.
+• If you use the same Master Secret and Service details on ANOTHER computer, the password will be EXACTLY the same.
+• You can save the service settings (without the password) using the "Save Service" button for quick access.
+""",
+        "🎨 Arrangement Patterns": """
+Mental Mode allows you to choose how your password is built:
 
 • PREFIX: The fixed text you defined (e.g., BI).
 • MIDDLE: The length of the service name + the Capital letter you provided. 
-  (For "gmail" which is 5 letters and letter G, MIDDLE is "5G").
 • SPECIAL: Your chosen symbols (e.g., @).
 • END_NUMBER: Your Base Number + the length of the service name. 
-  (Base 100 + 5 letters = 105).
 
-Available Arrangement Patterns:
+Available Patterns:
 1. PREFIX + MIDDLE + SPECIAL + END_NUMBER (BI5G@105)
 2. END_NUMBER + MIDDLE + SPECIAL + PREFIX (1055G@BI)
 3. SPECIAL + PREFIX + MIDDLE + END_NUMBER (@BI5G105)
@@ -64,34 +74,30 @@ Available Arrangement Patterns:
 5. PREFIX + SPECIAL + MIDDLE + END_NUMBER (BI@5G105)
 6. END_NUMBER + SPECIAL + PREFIX + MIDDLE (105@BI5G)
 """,
-        "🔒 Vault & Security": """
-• Master Password: Encrypts all your data. Cannot be recovered if lost.
-• Secure Profiles (🔒): Require the master password every time you load them. Great for Banking or Email.
-• Normal Profiles (📁): Load instantly without prompts.
+        "💾 Backup & Restore": """
+The Export/Import feature ensures you never lose your data. All backups are saved as .ibpass files.
 
-💾 Password Vault:
-• View Vault: Shows a table of your saved passwords.
-• Note Column: You can add an optional note (e.g., "Work Email") when saving a password to help you remember it.
-• Copying: Select any row in the Vault table and click "Copy Selected Password" to copy it securely to your clipboard.
-• Clear Vault: Permanently deletes all saved passwords from your vault.
-""",
-        "💾 Backup": """
-• Export Data: Saves your profiles and vault to a .spg file.
-• Advanced Security: You can encrypt the backup with a separate key. If you do, you MUST keep that key safe, otherwise you cannot import the file!
-• Import Data: Restores your data. Existing profiles with the same name will NOT be overwritten.
+• Export:
+  - Select "Profiles & Crypto Services" to backup your patterns and saved service settings.
+  - Select "Vault Only" to backup your saved passwords.
+  - Select "All Data" for a complete backup.
+  - IMPORTANT: You MUST set a Backup Password. This encrypts the file securely.
+
+• Import:
+  - Select the backup file, enter the Backup Password, and your data will be restored.
+  - If restoring a Vault, it will replace your current Vault. (Profiles and Crypto Services are merged safely).
+
+• Important Note: If you lose your Backup Password, the file cannot be recovered.
 """,
         "🔧 Troubleshooting": """
 • Clipboard not working on Linux? 
   Run: sudo apt install xclip
 
-• Forgot Master Password?
-  You must use Factory Reset. All data will be lost.
+• Forgot Application Master Password?
+  Click "Forgot Master Password?" on the login screen. This will trigger a Factory Reset, which deletes ALL local data. You can then restore your data using an .ibpass backup file.
 
-• Lost your Import Key?
-  The backup file cannot be decrypted.
-
-• Inputs not working?
-  For security reasons, some fields are restricted (e.g., Base Number only accepts digits, Prefix only accepts letters).
+• "Critical Security Error" on startup?
+  This means the encryption key is missing but data exists. The app prevents you from accidentally overwriting your data.
 """
     }
     
