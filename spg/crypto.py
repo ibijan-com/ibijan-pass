@@ -3,7 +3,7 @@ import json
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from .config import CONFIG_DIR, KEY_FILE, PROFILES_FILE, VAULT_FILE
+from .config import CONFIG_DIR, KEY_FILE, PROFILES_FILE, VAULT_FILE, CRYPTO_SERVICES_FILE # FIXED: Added CRYPTO_SERVICES_FILE
 
 class KeyIntegrityError(Exception):
     pass
@@ -35,7 +35,8 @@ def _derive_key(password: str, salt: bytes) -> bytes:
 def is_master_set() -> bool:
     """Check if the Master Password is set, preventing the 'New Install' trap."""
     key_exists = os.path.exists(KEY_FILE)
-    data_exists = os.path.exists(PROFILES_FILE) or os.path.exists(VAULT_FILE)
+    # FIXED: Added CRYPTO_SERVICES_FILE to the data existence check
+    data_exists = os.path.exists(PROFILES_FILE) or os.path.exists(VAULT_FILE) or os.path.exists(CRYPTO_SERVICES_FILE)
 
     if not key_exists and data_exists:
         raise KeyIntegrityError(
@@ -55,7 +56,8 @@ def setup_master_password(password: str):
     if os.path.exists(KEY_FILE):
         raise ValueError("Master password is already set.")
 
-    if os.path.exists(PROFILES_FILE) or os.path.exists(VAULT_FILE):
+    # FIXED: Added CRYPTO_SERVICES_FILE to prevent overwriting existing data
+    if os.path.exists(PROFILES_FILE) or os.path.exists(VAULT_FILE) or os.path.exists(CRYPTO_SERVICES_FILE):
         raise ValueError("Data files exist but key is missing. Factory Reset is required.")
 
     os.makedirs(CONFIG_DIR, exist_ok=True)

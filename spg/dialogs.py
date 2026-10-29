@@ -82,8 +82,8 @@ def verify_master_password_for_profile(root) -> bool:
 def show_file_locations(root):
     locations_window = tk.Toplevel(root)
     locations_window.title("File Locations - iBijan Pass")
-    locations_window.geometry("650x450")
-    locations_window.minsize(600, 400)
+    locations_window.geometry("650x500")
+    locations_window.minsize(600, 450)
 
     button_frame = tk.Frame(locations_window)
     button_frame.pack(side="bottom", fill="x", pady=10)
@@ -91,6 +91,9 @@ def show_file_locations(root):
     text_frame = tk.Frame(locations_window)
     text_frame.pack(side="top", fill="both", expand=True, padx=10, pady=(10, 0))
 
+    # FIXED: Removed MASTER_HASH_FILE and added CRYPTO_SERVICES_FILE
+    from .config import CRYPTO_SERVICES_FILE
+    
     content = f"""
 📁 Current File Locations on Your System:
 
@@ -103,17 +106,18 @@ def show_file_locations(root):
 🔐 Vault File (Encrypted):
 {VAULT_FILE}
 
-🗝️ Encryption Key:
-{KEY_FILE}
+🔑 Crypto Services (Encrypted):
+{CRYPTO_SERVICES_FILE}
 
-🔑 Master Password Hash:
-{MASTER_HASH_FILE}
+🗝️ Encryption Key (Key File):
+{KEY_FILE}
 
 📊 Status:
 • Config directory exists: {os.path.exists(CONFIG_DIR)}
 • Profiles file exists: {os.path.exists(PROFILES_FILE)}
 • Vault file exists: {os.path.exists(VAULT_FILE)}
-• Master password set: {os.path.exists(MASTER_HASH_FILE)}
+• Crypto services file exists: {os.path.exists(CRYPTO_SERVICES_FILE)}
+• Master key file exists: {os.path.exists(KEY_FILE)}
 
 💡 Important Information:
 • These paths are automatically created based on your system username
@@ -130,13 +134,13 @@ def show_file_locations(root):
     text_widget.config(state="disabled")
 
     def copy_all_paths():
-        all_paths = f"Config: {CONFIG_DIR}\nVault: {VAULT_FILE}\nProfiles: {PROFILES_FILE}"
+        all_paths = f"Config: {CONFIG_DIR}\nVault: {VAULT_FILE}\nProfiles: {PROFILES_FILE}\nCrypto: {CRYPTO_SERVICES_FILE}"
         clipboard_manager.copy_to_clipboard(all_paths)
         messagebox.showinfo("Copied", "File paths copied to clipboard!", parent=locations_window)
 
     tk.Button(button_frame, text="Copy All Paths", command=copy_all_paths, bg="#1C39BB", fg="white", width=15).pack(side="left", padx=20)
     tk.Button(button_frame, text="Close", command=locations_window.destroy, bg="#CC3333", fg="white", width=15).pack(side="right", padx=20)
-
+    
 
 def factory_reset(root, on_complete_callback=None):
     confirm1 = messagebox.askyesno(
@@ -184,10 +188,9 @@ def factory_reset(root, on_complete_callback=None):
 
 
 def _perform_factory_reset(root, on_complete_callback):
-    # FIXED: Added CRYPTO_SERVICES_FILE to the deletion list
-    from .config import CRYPTO_SERVICES_FILE
+    from .config import CRYPTO_SERVICES_FILE # Make sure to import this
     files_to_delete = [VAULT_FILE, PROFILES_FILE, MASTER_HASH_FILE, KEY_FILE, CRYPTO_SERVICES_FILE]
-        
+    
     for file_path in files_to_delete:
         if os.path.exists(file_path):
             try:
@@ -206,7 +209,7 @@ def _perform_factory_reset(root, on_complete_callback):
     # Restart the application
     root.destroy()
     os.execl(sys.executable, sys.executable, *sys.argv)
-
+    
 
 def open_config_folder(root):
     try:

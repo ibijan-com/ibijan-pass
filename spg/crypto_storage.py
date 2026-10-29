@@ -1,10 +1,6 @@
-"""
-Storage layer for Cryptographic Mode.
-Handles saving and loading of service metadata (NOT the generated passwords).
-"""
-
 import os
 import json
+import hashlib
 from .config import CRYPTO_SERVICES_FILE
 from .crypto import get_fernet
 from .storage import safe_write_file
@@ -31,40 +27,30 @@ class CryptoDataManager:
                 decrypted = get_fernet().decrypt(encrypted)
                 return json.loads(decrypted.decode())
             except Exception as e:
-                # If the file is corrupted (e.g., old key after factory reset)
-                # Rename it so the app doesn't crash, and start fresh.
-                backup_path = CRYPTO_SERVICES_FILE + ".corrupt"
-                try:
-                    os.replace(CRYPTO_SERVICES_FILE, backup_path)
-                except:
-                    pass
-                return {}
+                # DO NOT rename the file. Just report the error.
+                raise ValueError(f"Could not load crypto services. File may be corrupted or key is wrong. Details: {e}")
         return {}
-    
+
 crypto_data_manager = CryptoDataManager()
 
 def _get_key(service_name: str, account: str) -> str:
-    """Create a unique identifier using both service and account."""
-    svc = service_name.strip()
-    acct = account.strip()
-    if acct:
-        return f"{svc} | {acct}"
-    return svc
+    """Create a unique, collision-free identifier using SHA-256."""
+    data = f"{service_name.strip().lower()}|{account.strip().lower()}".encode('utf-8')
+    return hashlib.sha256(data).hexdigest()
 
-def save_crypto_service(service_name: str, account: str, version: int, length: int, 
-                        use_upper: bool, use_lower: bool, use_digits: bool, use_symbols: bool, salt_b64: str) -> tuple[bool, str]:
+def save_crypto_service(service_name: str, account: str, algorithm_version: str, password_revision: int, 
+                        length: int, use_upper: bool, use_lower: bool, use_digits: bool, use_symbols: bool, salt_b64: str) -> tuple[bool, str]:
     
     key = _get_key(service_name, account)
     services = crypto_data_manager.get_services()
     
-    if key in services:
-        return False, f"A service entry for '{key}' already exists."
-
+    # Allow updating an existing service (e.g., changing length)
     new_services = services.copy()
     new_services[key] = {
-        "service": service_name.strip(),
+        "service_name": service_name.strip(),
         "account": account.strip(),
-        "version": version,
+        "algorithm_version": algorithm_version,
+        "password_revision": password_revision,
         "length": length,
         "use_upper": use_upper,
         "use_lower": use_lower,
@@ -77,7 +63,7 @@ def save_crypto_service(service_name: str, account: str, version: int, length: i
         encrypted = get_fernet().encrypt(json.dumps(new_services).encode())
         safe_write_file(CRYPTO_SERVICES_FILE, encrypted)
         crypto_data_manager.invalidate_cache()
-        return True, f"Service entry for '{key}' saved successfully."
+        return True, "Service settings saved successfully."
     except Exception as e:
         return False, f"Failed to save service: {e}"
 

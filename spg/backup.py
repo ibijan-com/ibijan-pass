@@ -7,8 +7,9 @@ from tkinter import filedialog, messagebox
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
-from .config import VAULT_FILE, PROFILES_FILE
+from .config import VAULT_FILE, PROFILES_FILE, CRYPTO_SERVICES_FILE
 from .storage import data_manager, safe_write_file
+from .crypto_storage import crypto_data_manager
 from .dialogs import show_custom_error
 from .crypto import get_fernet
 
@@ -18,29 +19,25 @@ def _derive_backup_key(password: str, salt: bytes) -> bytes:
 
 def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
     try:
-        # Do not use .strip() on passwords. Check for empty string only.
         if not password:
             return False, "Export failed: A backup password is required."
 
         export_payload = {
-            "version": "1.0.0",
+            "version": "1.1.0",
             "export_date": datetime.now().isoformat(),
             "type": export_type,
             "data": {}
         }
         
         if export_type in ['profiles', 'all']:
-            from .storage import data_manager
-            from .crypto_storage import crypto_data_manager
             export_payload["data"]["profiles"] = data_manager.get_profiles()
             export_payload["data"]["crypto_services"] = crypto_data_manager.get_services()
-
+        
         if export_type in ['vault', 'all']:
             if os.path.exists(VAULT_FILE):
                 with open(VAULT_FILE, "rb") as f:
                     vault_encrypted = f.read()
                 try:
-                    # Must not silently skip a corrupted vault
                     vault_decrypted = get_fernet().decrypt(vault_encrypted).decode()
                     export_payload["data"]["vault_text"] = vault_decrypted
                 except Exception as e:
@@ -49,7 +46,6 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
                 if export_type == 'vault':
                     return False, "Export failed: No Vault file exists to export."
         
-        # Encrypt payload with password-derived key
         salt = os.urandom(16)
         key = _derive_backup_key(password, salt)
         f = Fernet(key)
@@ -63,8 +59,6 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
         }
         
         final_bytes = json.dumps(final_output).encode('utf-8')
-        
-        # Atomic write using the secure helper from storage.py
         safe_write_file(file_path, final_bytes)
         
         return True, "Export completed successfully!"
@@ -96,96 +90,96 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
             return False, "Invalid import file format."
         
         imported_profiles = 0
-        imported_vault = 0
+        imported_crypto = 0
+        vault_restored = False # FIXED: Changed to boolean
         
-        # Prepare data in memory before touching the filesystem
         profiles_to_write = None
+        crypto_to_write = None
         vault_to_write = None
-        
+
+        # 1. Prepare Data in Memory
         if "profiles" in import_payload["data"]:
             current_profiles = data_manager.get_profiles()
-            merged_profiles = current_profiles.copy()
+            merged = current_profiles.copy()
             for name, data in import_payload["data"]["profiles"].items():
-                if name not in merged_profiles:
-                    merged_profiles[name] = data
+                if name not in merged:
+                    merged[name] = data
                     imported_profiles += 1
-            
-            profiles_to_write = get_fernet().encrypt(json.dumps(merged_profiles).encode())
-                if "crypto_services" in import_payload["data"]:
-            from .crypto_storage import crypto_data_manager, CRYPTO_SERVICES_FILE
+            profiles_to_write = get_fernet().encrypt(json.dumps(merged).encode())
+
+        if "crypto_services" in import_payload["data"]:
             current_crypto = crypto_data_manager.get_services()
             merged_crypto = current_crypto.copy()
             for name, data in import_payload["data"]["crypto_services"].items():
                 if name not in merged_crypto:
                     merged_crypto[name] = data
-                    
-            encrypted_crypto = get_fernet().encrypt(json.dumps(merged_crypto).encode())
+                    imported_crypto += 1
+            crypto_to_write = get_fernet().encrypt(json.dumps(merged_crypto).encode())
             
-            # Use transactional logic like profiles
-            temp_crypto = CRYPTO_SERVICES_FILE + ".tmp_import"
-            bak_crypto = CRYPTO_SERVICES_FILE + ".bak"
-            
-            try:
-                with open(temp_crypto, "wb") as f: f.write(encrypted_crypto)
-                if os.path.exists(CRYPTO_SERVICES_FILE): os.replace(CRYPTO_SERVICES_FILE, bak_crypto)
-                os.replace(temp_crypto, CRYPTO_SERVICES_FILE)
-                if os.path.exists(bak_crypto): os.remove(bak_crypto)
-                crypto_data_manager.invalidate_cache()
-            except Exception as e:
-                if os.path.exists(temp_crypto): os.remove(temp_crypto)
-                if os.path.exists(bak_crypto):
-                    if os.path.exists(CRYPTO_SERVICES_FILE): os.remove(CRYPTO_SERVICES_FILE)
-                    os.replace(bak_crypto, CRYPTO_SERVICES_FILE)
-                return False, f"Import failed while writing crypto services: {e}"
-                
         if "vault_text" in import_payload["data"]:
             vault_text = import_payload["data"]["vault_text"]
             vault_to_write = get_fernet().encrypt(vault_text.encode())
-            imported_vault += 1
+            vault_restored = True
 
-        # Transactional File Write
-        temp_prof = PROFILES_FILE + ".tmp_import"
-        temp_vault = VAULT_FILE + ".tmp_import"
-        bak_prof = PROFILES_FILE + ".bak"
-        bak_vault = VAULT_FILE + ".bak"
-        
+        # 2. Transactional Write
+        paths = {
+            "profiles": (PROFILES_FILE, profiles_to_write),
+            "crypto": (CRYPTO_SERVICES_FILE, crypto_to_write),
+            "vault": (VAULT_FILE, vault_to_write)
+        }
+
+        temp_files = {}
+        bak_files = {}
+        existed_before = {} 
+
         try:
-            # 1. Write to temporary files
-            if profiles_to_write:
-                with open(temp_prof, "wb") as f: f.write(profiles_to_write)
-            if vault_to_write:
-                with open(temp_vault, "wb") as f: f.write(vault_to_write)
-            
-            # 2. Backup existing files
-            if os.path.exists(PROFILES_FILE): os.replace(PROFILES_FILE, bak_prof)
-            if os.path.exists(VAULT_FILE): os.replace(VAULT_FILE, bak_vault)
+            # Stage temp files
+            for k, (dest, data_bytes) in paths.items():
+                existed_before[k] = os.path.exists(dest)
+                if data_bytes:
+                    temp_path = dest + f".tmp_{k}"
+                    bak_path = dest + f".bak_{k}"
+                    with open(temp_path, "wb") as f:
+                        f.write(data_bytes)
+                    temp_files[k] = temp_path
+                    bak_files[k] = bak_path
 
-            # 3. Move new files into place
-            if profiles_to_write: os.replace(temp_prof, PROFILES_FILE)
-            if vault_to_write: os.replace(temp_vault, VAULT_FILE)
+            # Backup existing
+            for k, (dest, _) in paths.items():
+                if k in temp_files and existed_before[k]:
+                    os.replace(dest, bak_files[k])
 
-            # 4. Success: Clean up backup files
-            if os.path.exists(bak_prof): os.remove(bak_prof)
-            if os.path.exists(bak_vault): os.remove(bak_vault)
-            
+            # Move temp to dest
+            for k, temp_path in temp_files.items():
+                dest = paths[k][0]
+                os.replace(temp_path, dest)
+
+            # Success: cleanup backups
+            for k, bak_path in bak_files.items():
+                if os.path.exists(bak_path):
+                    os.remove(bak_path)
+
             data_manager.invalidate_cache()
+            crypto_data_manager.invalidate_cache()
 
         except Exception as e:
-            # Rollback mechanism on failure
-            if os.path.exists(temp_prof): os.remove(temp_prof)
-            if os.path.exists(temp_vault): os.remove(temp_vault)
-            
-            if os.path.exists(bak_prof):
-                if os.path.exists(PROFILES_FILE): os.remove(PROFILES_FILE)
-                os.replace(bak_prof, PROFILES_FILE)
-                
-            if os.path.exists(bak_vault):
-                if os.path.exists(VAULT_FILE): os.remove(VAULT_FILE)
-                os.replace(bak_vault, VAULT_FILE)
-                
+            # Rollback
+            for k, temp_path in temp_files.items():
+                if os.path.exists(temp_path): os.remove(temp_path)
+
+            for k, (dest, _) in paths.items():
+                if k in temp_files:
+                    if existed_before[k] and os.path.exists(bak_files[k]):
+                        if os.path.exists(dest): os.remove(dest)
+                        os.replace(bak_files[k], dest)
+                    elif not existed_before[k] and os.path.exists(dest):
+                        os.remove(dest)
+
             return False, f"Import failed during write. Existing data was preserved.\nDetails: {e}"
         
-        return True, f"Import completed!\nProfiles restored: {imported_profiles}\nVault items restored: {imported_vault}"
+        vault_status = "Yes" if vault_restored else "No"
+        # FIXED: Updated success message to not show a fake count
+        return True, f"Import completed!\nProfiles restored: {imported_profiles}\nCrypto services restored: {imported_crypto}\nVault Data Restored: {vault_status}"
     
     except InvalidToken:
         return False, "Incorrect Password!\n\nThe password you entered does not match this backup file."
@@ -207,9 +201,9 @@ def show_export_dialog(root):
     
     tk.Label(export_window, text="Select data to export:", font=("Helvetica", 10, "bold")).pack(anchor="w", padx=20, pady=5)
     export_var = tk.StringVar(value="all")
-    tk.Radiobutton(export_window, text="Profiles Only (Settings & Patterns)", variable=export_var, value="profiles").pack(anchor="w", padx=20)
+    tk.Radiobutton(export_window, text="Profiles & Crypto Services", variable=export_var, value="profiles").pack(anchor="w", padx=20)
     tk.Radiobutton(export_window, text="Vault Only (Saved Passwords)", variable=export_var, value="vault").pack(anchor="w", padx=20)
-    tk.Radiobutton(export_window, text="All Data (Profiles + Vault)", variable=export_var, value="all").pack(anchor="w", padx=20)
+    tk.Radiobutton(export_window, text="All Data (Profiles + Crypto + Vault)", variable=export_var, value="all").pack(anchor="w", padx=20)
     
     tk.Label(export_window, text="Backup Password (Required for security):", font=("Helvetica", 10, "bold")).pack(anchor="w", padx=20, pady=(15, 5))
     pw_entry = tk.Entry(export_window, width=40, show="*")
