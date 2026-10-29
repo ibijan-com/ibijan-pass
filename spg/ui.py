@@ -142,10 +142,22 @@ class SPGApp:
         self.login_entry.pack(pady=10, ipady=5)
         self.login_entry.focus()
         
-        ttk.Button(self.root, text="🔓 Unlock", style="Primary.TButton", command=self.authenticate).pack(pady=20, ipadx=30, ipady=5)
+        ttk.Button(self.root, text="🔓 Unlock", style="Primary.TButton", command=self.authenticate).pack(pady=(20, 10), ipadx=30, ipady=5)
         self.login_entry.bind("<Return>", lambda e: self.authenticate())
+        
+        # FIXED: Moved fg=COLOR_DANGER outside the font tuple
+        forgot_btn = tk.Button(self.root, text="Forgot Master Password?", 
+                               font=("Helvetica", 9), 
+                               fg=COLOR_DANGER, 
+                               bg="#FFFFFF", 
+                               activebackground="#FFFFFF", 
+                               relief="flat", 
+                               cursor="hand2",
+                               command=lambda: factory_reset(self.root, self.root.destroy))
+        forgot_btn.pack(pady=5)
+        
         tk.Label(self.root, text=f"v{APP_VERSION} • {APP_WEBSITE}", font=("Helvetica", 8), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(side="bottom", pady=15)
-
+                
     def authenticate(self):
         password = self.login_entry.get()
         if verify_master_password(password):
@@ -387,24 +399,37 @@ class SPGApp:
     def update_crypto_combo(self):
         try:
             services = crypto_data_manager.get_services()
-            # The keys are already formatted as "google | user@gmail.com"
-            self.crypto_service_combo['values'] = list(services.keys())
-            if services:
+            display_names = []
+            self._crypto_key_map = {} # Map display names to actual SHA256 keys
+            
+            for key, data in services.items():
+                svc = data.get("service_name", "")
+                acct = data.get("account", "")
+                display_str = f"{svc} | {acct}" if acct else svc
+                display_names.append(display_str)
+                self._crypto_key_map[display_str] = key
+            
+            self.crypto_service_combo['values'] = display_names
+            if display_names:
                 self.crypto_service_combo.current(0)
         except Exception as e:
             messagebox.showerror("Data Error", f"Could not load crypto services:\n{e}", parent=self.root)
-
+            
     def load_crypto_service(self):
-        key = self.crypto_service_var.get()
-        if not key:
+        display_str = self.crypto_service_var.get()
+        if not display_str:
             messagebox.showwarning("Select", "Please select a service to load.", parent=self.root)
+            return
+            
+        key = getattr(self, '_crypto_key_map', {}).get(display_str)
+        if not key:
             return
             
         data = load_crypto_service(key)
         if data:
             self.crypto_svc_entry._clear_placeholder()
             self.crypto_svc_entry.delete(0, tk.END)
-            self.crypto_svc_entry.insert(0, data.get("service", ""))
+            self.crypto_svc_entry.insert(0, data.get("service_name", ""))
             
             self.crypto_acct_entry._clear_placeholder()
             self.crypto_acct_entry.delete(0, tk.END)
@@ -416,18 +441,21 @@ class SPGApp:
             self.crypto_digits_var.set(data.get("use_digits", True))
             self.crypto_symbols_var.set(data.get("use_symbols", True))
             
-            # Do NOT populate Master Secret for security reasons
             self.crypto_master_secret_entry.delete(0, tk.END)
             self.crypto_master_secret_entry.focus()
 
     def delete_crypto_service(self):
-        key = self.crypto_service_var.get()
+        display_str = self.crypto_service_var.get()
+        if not display_str: return
+        
+        key = getattr(self, '_crypto_key_map', {}).get(display_str)
         if not key: return
-        if messagebox.askyesno("Confirm", f"Delete service entry '{key}'?", parent=self.root):
+        
+        if messagebox.askyesno("Confirm", f"Delete service entry '{display_str}'?", parent=self.root):
             if delete_crypto_service(key):
                 self.update_crypto_combo()
                 self.crypto_service_var.set("")
-
+                
     def generate_crypto_password_action(self):
         secret = self.crypto_master_secret_entry.get()
         svc = self.crypto_svc_entry.get_value().strip()
@@ -437,20 +465,24 @@ class SPGApp:
             messagebox.showerror("Error", "Master Secret and Service Name are required.", parent=self.root)
             return
             
-        key = f"{svc} | {acct}" if acct else svc
+        from .crypto_storage import _get_key
+        key = _get_key(svc, acct)
         
         # Check if we have a saved salt for this service
         saved_data = load_crypto_service(key)
         if saved_data and saved_data.get("salt"):
             salt = decode_salt(saved_data["salt"])
         else:
-            # If not saved, generate a salt AND auto-save it to ensure the password remains reproducible!
+            # Generate a new salt if this is a brand new service
             salt = generate_salt()
             salt_b64 = encode_salt(salt)
+            
+            # FIXED: Updated arguments to match new crypto_storage signature
             save_crypto_service(
                 service_name=svc,
                 account=acct,
-                version=1,
+                algorithm_version="1.0",
+                password_revision=1,
                 length=self.crypto_length_var.get(),
                 use_upper=self.crypto_upper_var.get(),
                 use_lower=self.crypto_lower_var.get(),
@@ -461,11 +493,13 @@ class SPGApp:
             self.update_crypto_combo()
 
         try:
+            # FIXED: Changed 'version=1' to 'password_revision=1'
             pw = generate_crypto_password(
                 master_secret=secret,
                 salt=salt,
                 service=svc,
                 account=acct,
+                password_revision=1,
                 length=self.crypto_length_var.get(),
                 use_upper=self.crypto_upper_var.get(),
                 use_lower=self.crypto_lower_var.get(),
@@ -474,11 +508,10 @@ class SPGApp:
             )
             
             clipboard_manager.copy_to_clipboard(pw)
-            messagebox.showinfo("Generated", f"Cryptographic password for '{key}' generated and copied to clipboard.\n\n(This password is deterministic and will be the same every time).", parent=self.root)
+            messagebox.showinfo("Generated", f"Cryptographic password for '{svc}' generated and copied to clipboard.\n\n(This password is deterministic and will be the same every time).", parent=self.root)
             
         except Exception as e:
             messagebox.showerror("Error", str(e), parent=self.root)
-            
     def save_crypto_service_action(self):
         svc = self.crypto_svc_entry.get_value().strip()
         acct = self.crypto_acct_entry.get_value().strip()
@@ -487,21 +520,22 @@ class SPGApp:
             messagebox.showerror("Error", "Service Name is required.", parent=self.root)
             return
             
-        key = f"{svc} | {acct}" if acct else svc
+        from .crypto_storage import _get_key
+        key = _get_key(svc, acct)
         
         # Check if it already exists
         saved_data = load_crypto_service(key)
         if saved_data:
-            # Update existing (keep the old salt to avoid changing the generated password)
             salt_b64 = saved_data["salt"]
         else:
-            # Generate a new salt for a new entry
             salt_b64 = encode_salt(generate_salt())
             
+        # FIXED: Updated arguments to match new crypto_storage signature
         success, msg = save_crypto_service(
             service_name=svc,
             account=acct,
-            version=1,
+            algorithm_version="1.0",
+            password_revision=1,
             length=self.crypto_length_var.get(),
             use_upper=self.crypto_upper_var.get(),
             use_lower=self.crypto_lower_var.get(),
@@ -515,7 +549,7 @@ class SPGApp:
             self.update_crypto_combo()
         else:
             messagebox.showerror("Error", msg, parent=self.root)
-            
+                        
     def clear_crypto_inputs(self):
         self.crypto_master_secret_entry.delete(0, tk.END)
         self.crypto_svc_entry._clear_placeholder()
