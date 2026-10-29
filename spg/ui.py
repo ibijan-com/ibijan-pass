@@ -17,6 +17,10 @@ from .storage import (
     save_to_vault, get_vault_data, clear_vault, delete_from_vault
 )
 from .generator import build_password
+from .crypto_generator import generate_crypto_password, generate_salt, encode_salt, decode_salt
+from .crypto_storage import (
+    crypto_data_manager, save_crypto_service, delete_crypto_service, load_crypto_service
+)
 from .dialogs import (
     verify_master_password_for_profile, show_file_locations, 
     factory_reset, open_config_folder, show_about_dialog
@@ -66,7 +70,7 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
-        self.root.minsize(680, 850)
+        self.root.minsize(700, 880)
         self.root.configure(bg="#FFFFFF")
         
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -190,14 +194,61 @@ class SPGApp:
         main_frame = tk.Frame(self.root, bg="#FFFFFF", padx=15, pady=15)
         main_frame.pack(fill="both", expand=True)
 
+        # Bottom and Data frames packed first to stay at the bottom
+        bottom_frame = tk.Frame(main_frame, bg="#FFFFFF")
+        bottom_frame.pack(fill="x", side="bottom", pady=(10, 0))
+        
+        data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        data_frame.pack(fill="x", side="bottom", pady=10)
+        btn_frame = tk.Frame(data_frame, bg="#FFFFFF")
+        btn_frame.pack(pady=10)
+        ttk.Button(btn_frame, text="📤 Export", style="Success.TButton", command=lambda: show_export_dialog(self.root)).pack(side="left", padx=10)
+        ttk.Button(btn_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.after_import_callback)).pack(side="left", padx=10)
+
+        # Header
         header_frame = tk.Frame(main_frame, bg="#FFFFFF")
         header_frame.pack(fill="x", pady=(0, 10))
         tk.Label(header_frame, text="🔐 iBijan Pass", font=("Helvetica", 16, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").pack(side="left")
         ttk.Button(header_frame, text="💡 About", style="Primary.TButton", command=lambda: show_about_dialog(self.root)).pack(side="right", padx=5)
         ttk.Button(header_frame, text="📚 Help Guide", style="Primary.TButton", command=lambda: show_comprehensive_help(self.root)).pack(side="right")
 
-        profile_frame = tk.LabelFrame(main_frame, text=" 📁 Saved Patterns ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        profile_frame.pack(fill="x", pady=(0, 5))
+        # Notebook (Tabs)
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.pack(fill="both", expand=True, pady=(0, 10))
+
+        self.tab_mental = tk.Frame(self.notebook, bg="#FFFFFF")
+        self.notebook.add(self.tab_mental, text=" 🧠 Mental Mode ")
+        self.build_mental_mode_ui(self.tab_mental)
+
+        self.tab_crypto = tk.Frame(self.notebook, bg="#FFFFFF")
+        self.notebook.add(self.tab_crypto, text=" 🔐 Cryptographic Mode ")
+        self.build_crypto_mode_ui(self.tab_crypto)
+
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_change)
+
+        # Bottom Buttons
+        ttk.Button(bottom_frame, text="📁 Open Config", style="Primary.TButton", command=lambda: open_config_folder(self.root)).pack(side="left", padx=2)
+        ttk.Button(bottom_frame, text="📍 File Locations", style="Primary.TButton", command=lambda: show_file_locations(self.root)).pack(side="left", padx=2)
+        
+        def _clear_vault_action():
+            if messagebox.askyesno("Confirm", "Permanently delete ALL saved passwords?", parent=self.root):
+                success, msg = clear_vault()
+                messagebox.showinfo("Vault", msg, parent=self.root)
+
+        ttk.Button(bottom_frame, text="⚠️ Clear Vault", style="Danger.TButton", command=_clear_vault_action).pack(side="right", padx=(2, 10))
+        ttk.Button(bottom_frame, text="🔥 Factory Reset", style="Danger.TButton", command=lambda: factory_reset(self.root, self.root.destroy)).pack(side="right", padx=2)
+
+    def on_tab_change(self, event):
+        """Clear the Master Secret if the user switches tabs to prevent accidental leaks."""
+        if hasattr(self, 'crypto_master_secret_entry'):
+            self.crypto_master_secret_entry.delete(0, tk.END)
+
+    # ==========================================
+    # MENTAL MODE UI
+    # ==========================================
+    def build_mental_mode_ui(self, parent):
+        profile_frame = tk.LabelFrame(parent, text=" 📁 Saved Patterns ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        profile_frame.pack(fill="x", pady=(10, 5))
 
         tk.Label(profile_frame, text="Select Pattern:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10)
         self.profile_var = tk.StringVar()
@@ -211,10 +262,10 @@ class SPGApp:
 
         ttk.Button(profile_frame, text="🗑️ Delete Pattern", style="Danger.TButton", command=self.delete_selected_profile).grid(row=0, column=3, padx=2)
 
-        hint_label = tk.Label(main_frame, text="Hint: Save your base components as a Pattern. Load it, then just change the Service Name for each new service.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF")
+        hint_label = tk.Label(parent, text="Hint: Save your base components as a Pattern. Load it, then just change the Service Name for each new service.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF")
         hint_label.pack(fill="x", pady=(0, 10))
 
-        settings_frame = tk.LabelFrame(main_frame, text=" 🔧 Password Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        settings_frame = tk.LabelFrame(parent, text=" 🔧 Password Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         settings_frame.pack(fill="x", pady=(0, 15))
         
         vcmd_pref = (self.root.register(validate_prefix), '%P')
@@ -260,7 +311,7 @@ class SPGApp:
         self.note_entry = PlaceholderEntry(settings_frame, placeholder="e.g., Work Email Account", width=40)
         self.note_entry.grid(row=8, column=1, columnspan=2, padx=5, pady=5, sticky="w")
 
-        action_frame = tk.Frame(main_frame, bg="#FFFFFF")
+        action_frame = tk.Frame(parent, bg="#FFFFFF")
         action_frame.pack(fill="x", pady=10)
 
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 5), ipadx=5, ipady=5)
@@ -269,27 +320,219 @@ class SPGApp:
         ttk.Button(action_frame, text="👁️ Preview All", style="Primary.TButton", command=self.show_preview_all_dialog).pack(side="left", padx=5)
         ttk.Button(action_frame, text="🧹 Clear All", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=5)
 
-        data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        data_frame.pack(fill="x", pady=10)
-        btn_frame = tk.Frame(data_frame, bg="#FFFFFF")
-        btn_frame.pack(pady=10)
-        ttk.Button(btn_frame, text="📤 Export", style="Success.TButton", command=lambda: show_export_dialog(self.root)).pack(side="left", padx=10)
-        ttk.Button(btn_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.after_import_callback)).pack(side="left", padx=10)
+    # ==========================================
+    # CRYPTOGRAPHIC MODE UI
+    # ==========================================
+    def build_crypto_mode_ui(self, parent):
+        top_frame = tk.Frame(parent, bg="#FFFFFF")
+        top_frame.pack(fill="x", pady=(10, 5))
         
-        bottom_frame = tk.Frame(main_frame, bg="#FFFFFF")
-        bottom_frame.pack(fill="x", side="bottom", pady=10)
-        
-        ttk.Button(bottom_frame, text="📁 Open Config", style="Primary.TButton", command=lambda: open_config_folder(self.root)).pack(side="left", padx=2)
-        ttk.Button(bottom_frame, text="📍 File Locations", style="Primary.TButton", command=lambda: show_file_locations(self.root)).pack(side="left", padx=2)
-        
-        def _clear_vault_action():
-            if messagebox.askyesno("Confirm", "Permanently delete ALL saved passwords?", parent=self.root):
-                success, msg = clear_vault()
-                messagebox.showinfo("Vault", msg, parent=self.root)
+        tk.Label(top_frame, text="Cryptographic Mode generates site-specific passwords from a Master Secret without saving them.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(anchor="w", padx=5)
 
-        ttk.Button(bottom_frame, text="⚠️ Clear Vault", style="Danger.TButton", command=_clear_vault_action).pack(side="right", padx=(2, 10))
-        ttk.Button(bottom_frame, text="🔥 Factory Reset", style="Danger.TButton", command=lambda: factory_reset(self.root, self.root.destroy)).pack(side="right", padx=2)
+        # Saved Services Frame
+        service_frame = tk.LabelFrame(parent, text=" 🔐 Saved Services ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        service_frame.pack(fill="x", pady=(5, 10))
 
+        tk.Label(service_frame, text="Load Service:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10)
+        self.crypto_service_var = tk.StringVar()
+        self.crypto_service_combo = ttk.Combobox(service_frame, textvariable=self.crypto_service_var, width=30, state="readonly")
+        self.crypto_service_combo.grid(row=0, column=1, padx=5, pady=10)
+        self.update_crypto_combo()
+        
+        ttk.Button(service_frame, text="📥 Load", style="Primary.TButton", command=self.load_crypto_service).grid(row=0, column=2, padx=2)
+        ttk.Button(service_frame, text="🗑️ Delete", style="Danger.TButton", command=self.delete_crypto_service).grid(row=0, column=3, padx=2)
+
+        # Settings Frame
+        settings_frame = tk.LabelFrame(parent, text=" ⚙️ Generation Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        settings_frame.pack(fill="x", pady=(0, 15))
+
+        # Master Secret (Masked)
+        tk.Label(settings_frame, text="Master Secret:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        self.crypto_master_secret_entry = tk.Entry(settings_frame, width=30, show="*")
+        self.crypto_master_secret_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Label(settings_frame, text="Service Name:", bg="#FFFFFF").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        self.crypto_svc_entry = PlaceholderEntry(settings_frame, placeholder="e.g., google", width=30)
+        self.crypto_svc_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Label(settings_frame, text="Account/Username:", bg="#FFFFFF").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.crypto_acct_entry = PlaceholderEntry(settings_frame, placeholder="e.g., user@email.com", width=30)
+        self.crypto_acct_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Label(settings_frame, text="Password Length:", bg="#FFFFFF").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        self.crypto_length_var = tk.IntVar(value=16)
+        tk.Spinbox(settings_frame, from_=4, to=128, textvariable=self.crypto_length_var, width=5).grid(row=3, column=1, padx=5, pady=5, sticky="w")
+
+        # Checkboxes for policies
+        self.crypto_upper_var = tk.BooleanVar(value=True)
+        self.crypto_lower_var = tk.BooleanVar(value=True)
+        self.crypto_digits_var = tk.BooleanVar(value=True)
+        self.crypto_symbols_var = tk.BooleanVar(value=True)
+
+        policy_frame = tk.Frame(settings_frame, bg="#FFFFFF")
+        policy_frame.grid(row=4, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        tk.Checkbutton(policy_frame, text="Uppercase", variable=self.crypto_upper_var, bg="#FFFFFF").pack(side="left", padx=5)
+        tk.Checkbutton(policy_frame, text="Lowercase", variable=self.crypto_lower_var, bg="#FFFFFF").pack(side="left", padx=5)
+        tk.Checkbutton(policy_frame, text="Digits", variable=self.crypto_digits_var, bg="#FFFFFF").pack(side="left", padx=5)
+        tk.Checkbutton(policy_frame, text="Symbols", variable=self.crypto_symbols_var, bg="#FFFFFF").pack(side="left", padx=5)
+
+        # Actions
+        action_frame = tk.Frame(parent, bg="#FFFFFF")
+        action_frame.pack(fill="x", pady=10)
+
+        ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_crypto_password_action).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
+        ttk.Button(action_frame, text="💾 Save Service", style="Success.TButton", command=self.save_crypto_service_action).pack(side="left", padx=5)
+        ttk.Button(action_frame, text="🧹 Clear", style="Neutral.TButton", command=self.clear_crypto_inputs).pack(side="left", padx=5)
+
+    def update_crypto_combo(self):
+        try:
+            services = crypto_data_manager.get_services()
+            # The keys are already formatted as "google | user@gmail.com"
+            self.crypto_service_combo['values'] = list(services.keys())
+            if services:
+                self.crypto_service_combo.current(0)
+        except Exception as e:
+            messagebox.showerror("Data Error", f"Could not load crypto services:\n{e}", parent=self.root)
+
+    def load_crypto_service(self):
+        key = self.crypto_service_var.get()
+        if not key:
+            messagebox.showwarning("Select", "Please select a service to load.", parent=self.root)
+            return
+            
+        data = load_crypto_service(key)
+        if data:
+            self.crypto_svc_entry._clear_placeholder()
+            self.crypto_svc_entry.delete(0, tk.END)
+            self.crypto_svc_entry.insert(0, data.get("service", ""))
+            
+            self.crypto_acct_entry._clear_placeholder()
+            self.crypto_acct_entry.delete(0, tk.END)
+            self.crypto_acct_entry.insert(0, data.get("account", ""))
+            
+            self.crypto_length_var.set(data.get("length", 16))
+            self.crypto_upper_var.set(data.get("use_upper", True))
+            self.crypto_lower_var.set(data.get("use_lower", True))
+            self.crypto_digits_var.set(data.get("use_digits", True))
+            self.crypto_symbols_var.set(data.get("use_symbols", True))
+            
+            # Do NOT populate Master Secret for security reasons
+            self.crypto_master_secret_entry.delete(0, tk.END)
+            self.crypto_master_secret_entry.focus()
+
+    def delete_crypto_service(self):
+        key = self.crypto_service_var.get()
+        if not key: return
+        if messagebox.askyesno("Confirm", f"Delete service entry '{key}'?", parent=self.root):
+            if delete_crypto_service(key):
+                self.update_crypto_combo()
+                self.crypto_service_var.set("")
+
+    def generate_crypto_password_action(self):
+        secret = self.crypto_master_secret_entry.get()
+        svc = self.crypto_svc_entry.get_value().strip()
+        acct = self.crypto_acct_entry.get_value().strip()
+        
+        if not secret or not svc:
+            messagebox.showerror("Error", "Master Secret and Service Name are required.", parent=self.root)
+            return
+            
+        key = f"{svc} | {acct}" if acct else svc
+        
+        # Check if we have a saved salt for this service
+        saved_data = load_crypto_service(key)
+        if saved_data and saved_data.get("salt"):
+            salt = decode_salt(saved_data["salt"])
+        else:
+            # If not saved, generate a salt AND auto-save it to ensure the password remains reproducible!
+            salt = generate_salt()
+            salt_b64 = encode_salt(salt)
+            save_crypto_service(
+                service_name=svc,
+                account=acct,
+                version=1,
+                length=self.crypto_length_var.get(),
+                use_upper=self.crypto_upper_var.get(),
+                use_lower=self.crypto_lower_var.get(),
+                use_digits=self.crypto_digits_var.get(),
+                use_symbols=self.crypto_symbols_var.get(),
+                salt_b64=salt_b64
+            )
+            self.update_crypto_combo()
+
+        try:
+            pw = generate_crypto_password(
+                master_secret=secret,
+                salt=salt,
+                service=svc,
+                account=acct,
+                length=self.crypto_length_var.get(),
+                use_upper=self.crypto_upper_var.get(),
+                use_lower=self.crypto_lower_var.get(),
+                use_digits=self.crypto_digits_var.get(),
+                use_symbols=self.crypto_symbols_var.get()
+            )
+            
+            clipboard_manager.copy_to_clipboard(pw)
+            messagebox.showinfo("Generated", f"Cryptographic password for '{key}' generated and copied to clipboard.\n\n(This password is deterministic and will be the same every time).", parent=self.root)
+            
+        except Exception as e:
+            messagebox.showerror("Error", str(e), parent=self.root)
+            
+    def save_crypto_service_action(self):
+        svc = self.crypto_svc_entry.get_value().strip()
+        acct = self.crypto_acct_entry.get_value().strip()
+        
+        if not svc:
+            messagebox.showerror("Error", "Service Name is required.", parent=self.root)
+            return
+            
+        key = f"{svc} | {acct}" if acct else svc
+        
+        # Check if it already exists
+        saved_data = load_crypto_service(key)
+        if saved_data:
+            # Update existing (keep the old salt to avoid changing the generated password)
+            salt_b64 = saved_data["salt"]
+        else:
+            # Generate a new salt for a new entry
+            salt_b64 = encode_salt(generate_salt())
+            
+        success, msg = save_crypto_service(
+            service_name=svc,
+            account=acct,
+            version=1,
+            length=self.crypto_length_var.get(),
+            use_upper=self.crypto_upper_var.get(),
+            use_lower=self.crypto_lower_var.get(),
+            use_digits=self.crypto_digits_var.get(),
+            use_symbols=self.crypto_symbols_var.get(),
+            salt_b64=salt_b64
+        )
+        
+        if success:
+            messagebox.showinfo("Saved", msg, parent=self.root)
+            self.update_crypto_combo()
+        else:
+            messagebox.showerror("Error", msg, parent=self.root)
+            
+    def clear_crypto_inputs(self):
+        self.crypto_master_secret_entry.delete(0, tk.END)
+        self.crypto_svc_entry._clear_placeholder()
+        self.crypto_svc_entry.delete(0, tk.END)
+        self.crypto_svc_entry._add_placeholder()
+        self.crypto_acct_entry._clear_placeholder()
+        self.crypto_acct_entry.delete(0, tk.END)
+        self.crypto_acct_entry._add_placeholder()
+        self.crypto_length_var.set(16)
+        self.crypto_upper_var.set(True)
+        self.crypto_lower_var.set(True)
+        self.crypto_digits_var.set(True)
+        self.crypto_symbols_var.set(True)
+
+    # ==========================================
+    # MENTAL MODE LOGIC (Unchanged)
+    # ==========================================
     def update_profile_combo(self):
         try:
             profiles = data_manager.get_profiles()
@@ -303,6 +546,7 @@ class SPGApp:
 
     def after_import_callback(self):
         self.update_profile_combo()
+        self.update_crypto_combo()
         if self.profile_var.get():
             self.load_selected_profile(show_msg=False)
             

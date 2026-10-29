@@ -31,21 +31,39 @@ class CryptoDataManager:
                 decrypted = get_fernet().decrypt(encrypted)
                 return json.loads(decrypted.decode())
             except Exception as e:
-                raise ValueError(f"Error reading crypto services: {str(e)}")
+                # If the file is corrupted (e.g., old key after factory reset)
+                # Rename it so the app doesn't crash, and start fresh.
+                backup_path = CRYPTO_SERVICES_FILE + ".corrupt"
+                try:
+                    os.replace(CRYPTO_SERVICES_FILE, backup_path)
+                except:
+                    pass
+                return {}
         return {}
-
+    
 crypto_data_manager = CryptoDataManager()
+
+def _get_key(service_name: str, account: str) -> str:
+    """Create a unique identifier using both service and account."""
+    svc = service_name.strip()
+    acct = account.strip()
+    if acct:
+        return f"{svc} | {acct}"
+    return svc
 
 def save_crypto_service(service_name: str, account: str, version: int, length: int, 
                         use_upper: bool, use_lower: bool, use_digits: bool, use_symbols: bool, salt_b64: str) -> tuple[bool, str]:
+    
+    key = _get_key(service_name, account)
     services = crypto_data_manager.get_services()
     
-    if service_name in services:
-        return False, "A service with this name already exists in Cryptographic Mode."
+    if key in services:
+        return False, f"A service entry for '{key}' already exists."
 
     new_services = services.copy()
-    new_services[service_name] = {
-        "account": account,
+    new_services[key] = {
+        "service": service_name.strip(),
+        "account": account.strip(),
         "version": version,
         "length": length,
         "use_upper": use_upper,
@@ -59,15 +77,15 @@ def save_crypto_service(service_name: str, account: str, version: int, length: i
         encrypted = get_fernet().encrypt(json.dumps(new_services).encode())
         safe_write_file(CRYPTO_SERVICES_FILE, encrypted)
         crypto_data_manager.invalidate_cache()
-        return True, f"Service '{service_name}' saved successfully."
+        return True, f"Service entry for '{key}' saved successfully."
     except Exception as e:
         return False, f"Failed to save service: {e}"
 
-def delete_crypto_service(service_name: str) -> bool:
+def delete_crypto_service(key: str) -> bool:
     services = crypto_data_manager.get_services()
-    if service_name in services:
+    if key in services:
         new_services = services.copy()
-        del new_services[service_name]
+        del new_services[key]
         try:
             encrypted = get_fernet().encrypt(json.dumps(new_services).encode())
             safe_write_file(CRYPTO_SERVICES_FILE, encrypted)
@@ -77,6 +95,6 @@ def delete_crypto_service(service_name: str) -> bool:
             print(f"Error deleting service: {e}")
     return False
 
-def load_crypto_service(service_name: str) -> dict | None:
+def load_crypto_service(key: str) -> dict | None:
     services = crypto_data_manager.get_services()
-    return services.get(service_name)
+    return services.get(key)

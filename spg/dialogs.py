@@ -184,8 +184,10 @@ def factory_reset(root, on_complete_callback=None):
 
 
 def _perform_factory_reset(root, on_complete_callback):
-    files_to_delete = [VAULT_FILE, PROFILES_FILE, MASTER_HASH_FILE, KEY_FILE]
-    
+    # FIXED: Added CRYPTO_SERVICES_FILE to the deletion list
+    from .config import CRYPTO_SERVICES_FILE
+    files_to_delete = [VAULT_FILE, PROFILES_FILE, MASTER_HASH_FILE, KEY_FILE, CRYPTO_SERVICES_FILE]
+        
     for file_path in files_to_delete:
         if os.path.exists(file_path):
             try:
