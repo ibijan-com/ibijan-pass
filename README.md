@@ -2,7 +2,7 @@
 **Memorable Password Generation**  
 *A personal-pattern approach to generating memorable passwords.*
 
-iBijan Pass is a secure, offline desktop application that generates highly customizable passwords based on your own patterns. It features a built-in encrypted vault and a profile management system to keep your accounts safe without relying on cloud services.
+iBijan Pass is a secure, offline desktop application that generates highly customizable passwords. It features a dual-mode system: Mental Mode (for memorable, pattern-based passwords) and Cryptographic Mode (for highly secure, deterministic passwords). It also includes a built-in encrypted vault and a robust backup system.
 
 **Website:** [ibijan.com](https://ibijan.com)  
 **Repository:** [github.com/ibijan-com/ibijan-pass](https://github.com/ibijan-com/ibijan-pass)
@@ -13,12 +13,16 @@ iBijan Pass is a secure, offline desktop application that generates highly custo
 
 ## Features
 
-- **Custom Generation Patterns:** Define exactly how your password is constructed using Prefixes, Base Numbers, Special Characters, and specific patterns.
-- **Portable Backup & Restore:** Export your data (Profiles and Vault) into a single `.ibpass` file. You can protect it with a custom password and restore it on **any computer**, even after a factory reset.
+### Dual Generation Modes
+- **Mental Mode:** Generate passwords based on personal patterns (Prefix, Base Number, Special Characters) that are easy for the human brain to remember and recreate.
+- **Cryptographic Mode:** Generate deterministic, site-specific passwords using a Master Secret and HMAC-SHA256. The same secret and service details will always generate the exact same highly secure password on any device, without ever saving the password to disk.
+
+### Security & Storage
 - **Encrypted Vault:** Save generated passwords securely. View them in a clean table format, add optional notes, and easily copy or bulk-delete multiple entries.
-- **Secure Profiles (🔒):** Add an extra layer of authentication for highly sensitive accounts (like Banking) requiring the Master Password.
-- **Military-Grade Encryption:** All local data is encrypted using AES-128 (Fernet).
-- **Auto-Load:** After importing a backup, the app automatically loads your first profile for immediate use.
+- **True Master Password:** Your Application Master Password is used to derive the encryption key using `scrypt`.
+- **Atomic Storage:** All data is saved using atomic file replacement to prevent corruption during unexpected crashes.
+- **Strict File Permissions:** Saved data is protected with `0600` permissions on Unix systems.
+- **Portable Backup & Restore:** Export all your data (Profiles, Crypto Services, and Vault) into a single `.ibpass` file. Protect it with a custom backup password and restore it anywhere.
 - **100% Offline:** No internet connection is required, and zero telemetry is collected.
 
 ---
@@ -35,20 +39,20 @@ You can download the latest packages from the [Releases](https://github.com/ibij
 ### Option 1: AppImage (Recommended for all distros)
 ~~~bash
 # Download the AppImage
-chmod +x ibijan-pass-1.0.2-x86_64.AppImage
-./ibijan-pass-1.0.2-x86_64.AppImage
+chmod +x ibijan-pass-1.1.0-x86_64.AppImage
+./ibijan-pass-1.1.0-x86_64.AppImage
 ~~~
 
 ### Option 2: DEB Package (Ubuntu / Debian / Kali)
 ~~~bash
 # Download the .deb file, then run:
-sudo apt install ./ibijan-pass_1.0.2_amd64.deb
+sudo apt install ./ibijan-pass_1.1.0_amd64.deb
 ~~~
 
 ### Option 3: RPM Package (Fedora / CentOS / RHEL)
 ~~~bash
 # Download the .rpm file, then run:
-sudo rpm -i ibijan-pass-1.0.2-1.x86_64.rpm
+sudo rpm -i ibijan-pass-1.1.0-1.x86_64.rpm
 ~~~
 
 ### Option 4: Run from Source (Developers)
@@ -68,26 +72,21 @@ python -m spg
 Moving your data between computers has never been easier:
 
 1. Click **Export** and select "All Data".
-2. Set a **Backup Password** (highly recommended) or leave it blank for a portable unprotected backup.
+2. Set a **Backup Password** (Required for security).
 3. Save the `.ibpass` file.
-4. On the new machine (or after a factory reset), open iBijan Pass, click **Import**, enter the password (if set), and select the file.
-5. Your profiles and vault items will be immediately restored.
+4. On the new machine (or after a factory reset), open iBijan Pass, click **Import**, enter the password, and select the file.
+5. Your profiles, crypto services, and vault items will be securely restored.
 
 ---
 
-## Security & Privacy
+## Important Migration Note
 
-- **True Master Password:** Your master password is used to derive the encryption key using `scrypt`. Without it, your data is mathematically inaccessible.
-- **Atomic Storage:** All data is saved using atomic file replacement to prevent corruption during unexpected crashes.
-- **Strict File Permissions:** Saved data is protected with `0600` permissions on Unix systems.
-- **Local Storage:** All data is stored locally in `~/.spg/` and is encrypted at rest.
-- **No Telemetry:** We don't collect any data.
-> **Important Migration Note:** If you used version 0.9.3 or older, you cannot open your old data directly with v1.0.0. Please export a backup from the old version, upgrade, and import it back.
+If you used version `1.0.2` or older, you must export your data before upgrading to `1.1.0`. Due to major security and storage architecture improvements (Atomic Writes and State Machine), older local files cannot be opened directly by the new version.
 
 ---
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request or open an Issue.
 
-##  License
+## License
 This project is licensed under the MIT License.
