@@ -64,9 +64,9 @@ jobs:
             cp spg/icon.png package/usr/share/icons/hicolor/256x256/apps/ibijan-pass.png
           fi
           
-          # Build .deb and .rpm (Version updated to 1.1.0)
-          fpm -s dir -t deb -n ibijan-pass -v 1.1.0 -C package usr/
-          fpm -s dir -t rpm -n ibijan-pass -v 1.1.0 -C package usr/
+          # Build .deb and .rpm (Version updated to 1.1.1)
+          fpm -s dir -t deb -n ibijan-pass -v 1.1.1 -C package usr/
+          fpm -s dir -t rpm -n ibijan-pass -v 1.1.1 -C package usr/
           
       - name: Build AppImage
         run: |
@@ -102,9 +102,9 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
           
-          # Build AppImage (Version updated to 1.1.0)
-          /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-1.1.0-x86_64.AppImage
-          chmod +x ibijan-pass-1.1.0-x86_64.AppImage
+          # Build AppImage (Version updated to 1.1.1)
+          /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-1.1.1-x86_64.AppImage
+          chmod +x ibijan-pass-1.1.1-x86_64.AppImage
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
