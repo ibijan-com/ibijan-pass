@@ -25,7 +25,7 @@ KEY_FILE = os.path.join(CONFIG_DIR, "key.key")
 MASTER_HASH_FILE = os.path.join(CONFIG_DIR, "master.hash")
 VAULT_FILE = os.path.join(CONFIG_DIR, "vault.enc")
 PROFILES_FILE = os.path.join(CONFIG_DIR, "profiles.enc")
-
+CRYPTO_SERVICES_FILE = os.path.join(CONFIG_DIR, "crypto_services.enc")
 
 # ============================================================
 # Password patterns

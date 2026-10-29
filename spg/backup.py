@@ -30,8 +30,11 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
         }
         
         if export_type in ['profiles', 'all']:
+            from .storage import data_manager
+            from .crypto_storage import crypto_data_manager
             export_payload["data"]["profiles"] = data_manager.get_profiles()
-        
+            export_payload["data"]["crypto_services"] = crypto_data_manager.get_services()
+
         if export_type in ['vault', 'all']:
             if os.path.exists(VAULT_FILE):
                 with open(VAULT_FILE, "rb") as f:
@@ -108,7 +111,33 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
                     imported_profiles += 1
             
             profiles_to_write = get_fernet().encrypt(json.dumps(merged_profiles).encode())
+                if "crypto_services" in import_payload["data"]:
+            from .crypto_storage import crypto_data_manager, CRYPTO_SERVICES_FILE
+            current_crypto = crypto_data_manager.get_services()
+            merged_crypto = current_crypto.copy()
+            for name, data in import_payload["data"]["crypto_services"].items():
+                if name not in merged_crypto:
+                    merged_crypto[name] = data
+                    
+            encrypted_crypto = get_fernet().encrypt(json.dumps(merged_crypto).encode())
             
+            # Use transactional logic like profiles
+            temp_crypto = CRYPTO_SERVICES_FILE + ".tmp_import"
+            bak_crypto = CRYPTO_SERVICES_FILE + ".bak"
+            
+            try:
+                with open(temp_crypto, "wb") as f: f.write(encrypted_crypto)
+                if os.path.exists(CRYPTO_SERVICES_FILE): os.replace(CRYPTO_SERVICES_FILE, bak_crypto)
+                os.replace(temp_crypto, CRYPTO_SERVICES_FILE)
+                if os.path.exists(bak_crypto): os.remove(bak_crypto)
+                crypto_data_manager.invalidate_cache()
+            except Exception as e:
+                if os.path.exists(temp_crypto): os.remove(temp_crypto)
+                if os.path.exists(bak_crypto):
+                    if os.path.exists(CRYPTO_SERVICES_FILE): os.remove(CRYPTO_SERVICES_FILE)
+                    os.replace(bak_crypto, CRYPTO_SERVICES_FILE)
+                return False, f"Import failed while writing crypto services: {e}"
+                
         if "vault_text" in import_payload["data"]:
             vault_text = import_payload["data"]["vault_text"]
             vault_to_write = get_fernet().encrypt(vault_text.encode())
