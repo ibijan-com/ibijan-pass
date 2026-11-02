@@ -14,7 +14,7 @@ from .dialogs import show_custom_error
 from .crypto import get_fernet
 
 def _derive_backup_key(password: str, salt: bytes) -> bytes:
-    kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
+    kdf = Scrypt(salt=salt, length=32, n=2**16, r=8, p=1)
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:

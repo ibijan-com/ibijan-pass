@@ -29,7 +29,7 @@ def lock_fernet():
 
 def _derive_key(password: str, salt: bytes) -> bytes:
     """Derive a 32-byte key using scrypt."""
-    kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
+    kdf = Scrypt(salt=salt, length=32, n=2**16, r=8, p=1)
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def is_master_set() -> bool:

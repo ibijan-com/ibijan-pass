@@ -3,7 +3,7 @@ name: Build & Release Linux Packages
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Triggers when you push a tag like v1.1.2
 
 permissions:
   contents: write
@@ -18,6 +18,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
           
       - name: Install dependencies
         run: |
@@ -44,10 +48,8 @@ jobs:
           mkdir -p package/usr/share/applications
           mkdir -p package/usr/share/icons/hicolor/256x256/apps
           
-          # Copy binary
           cp dist/ibijan-pass package/usr/bin/ibijan-pass
           
-          # Create desktop entry
           cat << 'EOF' > package/usr/share/applications/ibijan-pass.desktop
           [Desktop Entry]
           Name=iBijan Pass
@@ -59,14 +61,13 @@ jobs:
           Categories=Utility;
           EOF
           
-          # Copy icon if exists
           if [ -f spg/icon.png ]; then
             cp spg/icon.png package/usr/share/icons/hicolor/256x256/apps/ibijan-pass.png
           fi
           
-          # Build .deb and .rpm (Version updated to 1.1.1)
-          fpm -s dir -t deb -n ibijan-pass -v 1.1.1 -C package usr/
-          fpm -s dir -t rpm -n ibijan-pass -v 1.1.1 -C package usr/
+          # Build using the dynamic VERSION variable
+          fpm -s dir -t deb -n ibijan-pass -v ${{ env.VERSION }} -C package usr/
+          fpm -s dir -t rpm -n ibijan-pass -v ${{ env.VERSION }} -C package usr/
           
       - name: Build AppImage
         run: |
@@ -91,7 +92,6 @@ jobs:
             cp spg/icon.png AppDir/ibijan-pass.png
             cp spg/icon.png AppDir/.DirIcon
           else
-            echo "⚠️ icon.png not found in spg/. Using a fallback 1x1 PNG."
             echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > AppDir/ibijan-pass.png
             cp AppDir/ibijan-pass.png AppDir/.DirIcon
           fi
@@ -102,9 +102,14 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
           
-          # Build AppImage (Version updated to 1.1.1)
-          /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-1.1.1-x86_64.AppImage
-          chmod +x ibijan-pass-1.1.1-x86_64.AppImage
+          # Build AppImage using dynamic VERSION variable
+          /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-${{ env.VERSION }}-x86_64.AppImage
+          chmod +x ibijan-pass-${{ env.VERSION }}-x86_64.AppImage
+
+      # NEW: Generate SHA256 Checksums for release integrity
+      - name: Generate Checksums
+        run: |
+          sha256sum *.deb *.rpm *.AppImage > SHA256SUMS.txt
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -114,12 +119,13 @@ jobs:
             *.deb
             *.rpm
             *.AppImage
+            SHA256SUMS.txt
 
   release:
     needs: [build-linux]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code (to access CHANGELOG.md)
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Download all artifacts
@@ -130,6 +136,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/linux-packages/*
+          files: |
+            artifacts/linux-packages/*
           body_path: CHANGELOG.md
           generate_release_notes: true
