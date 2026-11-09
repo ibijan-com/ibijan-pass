@@ -31,10 +31,10 @@ jobs:
       - name: Build Linux Binary with PyInstaller
         run: |
           if [ -f spg/icon.png ]; then
-            pyinstaller --noconfirm --onefile --windowed --name "ibijan-pass" --icon=spg/icon.png run.py
+            pyinstaller --noconfirm --onefile --windowed --name "ibijan-pass" --icon=spg/icon.png --add-data "spg/icon.png:." run.py
           else
             pyinstaller --noconfirm --onefile --windowed --name "ibijan-pass" run.py
-          fi
+          fi          
           
       - name: Install packaging tools
         run: |
