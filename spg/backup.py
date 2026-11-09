@@ -13,8 +13,8 @@ from .crypto_storage import crypto_data_manager
 from .dialogs import show_custom_error
 from .crypto import get_fernet
 
-def _derive_backup_key(password: str, salt: bytes) -> bytes:
-    kdf = Scrypt(salt=salt, length=32, n=2**16, r=8, p=1)
+def _derive_backup_key(password: str, salt: bytes, n: int) -> bytes:
+    kdf = Scrypt(salt=salt, length=32, n=n, r=8, p=1)
     return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
@@ -47,13 +47,16 @@ def _export_data(export_type, file_path, password=None) -> tuple[bool, str]:
                     return False, "Export failed: No Vault file exists to export."
         
         salt = os.urandom(16)
-        key = _derive_backup_key(password, salt)
+        current_n = 2**16 # Use strong KDF for new backups
+        
+        key = _derive_backup_key(password, salt, current_n)
         f = Fernet(key)
         
         json_bytes = json.dumps(export_payload).encode()
         encrypted_data = f.encrypt(json_bytes)
         
         final_output = {
+            "kdf_n": current_n, # Store KDF param
             "salt": base64.b64encode(salt).decode('utf-8'),
             "payload": encrypted_data.decode('utf-8')
         }
@@ -80,7 +83,10 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         salt = base64.b64decode(file_payload["salt"])
         encrypted_data = file_payload["payload"].encode('utf-8')
         
-        key = _derive_backup_key(password, salt)
+        # Read KDF param from file (fallback to 2**14 for older backups)
+        kdf_n = file_payload.get("kdf_n", 2**14)
+        
+        key = _derive_backup_key(password, salt, kdf_n)
         f = Fernet(key)
         decrypted_data = f.decrypt(encrypted_data)
         
