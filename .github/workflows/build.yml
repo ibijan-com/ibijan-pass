@@ -3,19 +3,19 @@ name: Build & Release Linux Packages
 on:
   push:
     tags:
-      - 'v*' # Triggers when you push a tag like v1.1.4
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
   build-linux:
-    runs-on: ubuntu-24.04 # FIXED: Pinned to specific version to avoid future warnings
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4.2.2 # FIXED: Updated to latest patch
+      - uses: actions/checkout@v4.2.2
       
       - name: Set up Python
-        uses: actions/setup-python@v5.3.0 # FIXED: Updated to latest patch
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: '3.10'
           
@@ -39,7 +39,8 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ruby ruby-dev rubygems build-essential rpm libfuse2
+          # FIXED: Added imagemagick
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential rpm libfuse2 imagemagick
           sudo gem install --no-document fpm
           
       - name: Create .deb and .rpm packages
@@ -50,23 +51,25 @@ jobs:
           
           cp dist/ibijan-pass package/usr/bin/ibijan-pass
           
+          # FIXED: Resize icon to 256x256 for the .deb package
+          if [ -f spg/icon.png ]; then
+            convert spg/icon.png -resize 256x256 package/usr/share/icons/hicolor/256x256/apps/ibijan-pass.png
+          fi
+          
+          # FIXED: Changed StartupWMClass to Ibijan-pass (capital I)
           cat << 'EOF' > package/usr/share/applications/ibijan-pass.desktop
           [Desktop Entry]
+          Version=1.0
           Name=iBijan Pass
-          Comment=Smart Password Generator
+          Comment=Memorable Password Generation
           Exec=ibijan-pass
           Icon=ibijan-pass
           Terminal=false
           Type=Application
-          Categories=Utility;
-          StartupWMClass=ibijan-pass
+          Categories=Utility;Security;
+          StartupWMClass=Ibijan-pass
           EOF
           
-          if [ -f spg/icon.png ]; then
-            cp spg/icon.png package/usr/share/icons/hicolor/256x256/apps/ibijan-pass.png
-          fi
-          
-          # Build using the dynamic VERSION variable
           fpm -s dir -t deb -n ibijan-pass -v ${{ env.VERSION }} -C package usr/
           fpm -s dir -t rpm -n ibijan-pass -v ${{ env.VERSION }} -C package usr/
           
@@ -78,16 +81,18 @@ jobs:
           mkdir -p AppDir/usr/bin
           cp dist/ibijan-pass AppDir/usr/bin/
           
+          # FIXED: Changed StartupWMClass to Ibijan-pass (capital I)
           cat << 'EOF' > AppDir/ibijan-pass.desktop
           [Desktop Entry]
+          Version=1.0
           Name=iBijan Pass
-          Comment=Smart Password Generator
+          Comment=Memorable Password Generation
           Exec=ibijan-pass
           Icon=ibijan-pass
           Terminal=false
           Type=Application
-          Categories=Utility;
-          StartupWMClass=ibijan-pass
+          Categories=Utility;Security;
+          StartupWMClass=Ibijan-pass
           EOF
           
           if [ -f spg/icon.png ]; then
@@ -104,7 +109,6 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
           
-          # Build AppImage using dynamic VERSION variable
           /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-${{ env.VERSION }}-x86_64.AppImage
           chmod +x ibijan-pass-${{ env.VERSION }}-x86_64.AppImage
 
@@ -113,7 +117,7 @@ jobs:
           sha256sum *.deb *.rpm *.AppImage > SHA256SUMS.txt
 
       - name: Upload Linux Artifacts
-        uses: actions/upload-artifact@v4.4.3 # FIXED: Updated to latest patch
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: linux-packages
           path: |
@@ -124,18 +128,18 @@ jobs:
 
   release:
     needs: [build-linux]
-    runs-on: ubuntu-24.04 # FIXED: Pinned to specific version
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4.1.8 # FIXED: Updated to latest patch
+        uses: actions/download-artifact@v4.1.8
         with:
           path: artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2 # FIXED: Updated to v2
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/linux-packages/*
