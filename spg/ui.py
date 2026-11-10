@@ -85,12 +85,13 @@ class SPGApp:
         icon_path = os.path.join(bundle_dir, "icon.png")
         if os.path.exists(icon_path):
             try:
-                # Store as self.icon_img to prevent garbage collection
                 self.icon_img = tk.PhotoImage(file=icon_path)
                 self.root.iconphoto(True, self.icon_img)
+                # FIXED: Force update to apply the icon immediately
+                self.root.update_idletasks()
             except Exception as e:
                 print(f"Could not load icon: {e}")
-                        
+                                        
         self.last_generated_password = ""
         self._setup_styles()
 
