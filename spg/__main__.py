@@ -15,7 +15,8 @@ if os.name == 'posix':
         pass
 
 def main():
-    root = tk.Tk()
+    # Use className to ensure Linux taskbar picks up the correct icon
+    root = tk.Tk(className="ibijan-pass")
     app = SPGApp(root)
     root.mainloop()
 

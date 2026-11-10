@@ -59,6 +59,7 @@ jobs:
           Terminal=false
           Type=Application
           Categories=Utility;
+          StartupWMClass=ibijan-pass
           EOF
           
           if [ -f spg/icon.png ]; then
@@ -86,6 +87,7 @@ jobs:
           Terminal=false
           Type=Application
           Categories=Utility;
+          StartupWMClass=ibijan-pass
           EOF
           
           if [ -f spg/icon.png ]; then

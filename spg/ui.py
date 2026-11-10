@@ -73,7 +73,16 @@ class SPGApp:
         self.root.minsize(700, 880)
         self.root.configure(bg="#FFFFFF")
         
-        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        # FIXED: Set the window class for Linux taskbar matching
+        
+        # FIXED: Correctly locate the icon in PyInstaller bundles
+        import sys
+        if getattr(sys, 'frozen', False):
+            bundle_dir = sys._MEIPASS
+        else:
+            bundle_dir = os.path.dirname(os.path.abspath(__file__))
+            
+        icon_path = os.path.join(bundle_dir, "icon.png")
         if os.path.exists(icon_path):
             try:
                 icon_img = tk.PhotoImage(file=icon_path)
@@ -83,7 +92,7 @@ class SPGApp:
         
         self.last_generated_password = ""
         self._setup_styles()
-        
+
         self.root.bind_class("Entry", "<Control-a>", self._select_all)
         self.root.bind_class("Entry", "<Control-A>", self._select_all)
         self.root.bind_class("TEntry", "<Control-a>", self._select_all)
