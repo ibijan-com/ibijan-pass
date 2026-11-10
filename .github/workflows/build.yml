@@ -3,19 +3,19 @@ name: Build & Release Linux Packages
 on:
   push:
     tags:
-      - 'v*' # Triggers when you push a tag like v1.1.2
+      - 'v*' # Triggers when you push a tag like v1.1.4
 
 permissions:
   contents: write
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # FIXED: Pinned to specific version to avoid future warnings
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2 # FIXED: Updated to latest patch
       
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0 # FIXED: Updated to latest patch
         with:
           python-version: '3.10'
           
@@ -108,13 +108,12 @@ jobs:
           /tmp/appimagetool.AppImage --appimage-extract-and-run AppDir ibijan-pass-${{ env.VERSION }}-x86_64.AppImage
           chmod +x ibijan-pass-${{ env.VERSION }}-x86_64.AppImage
 
-      # NEW: Generate SHA256 Checksums for release integrity
       - name: Generate Checksums
         run: |
           sha256sum *.deb *.rpm *.AppImage > SHA256SUMS.txt
 
       - name: Upload Linux Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.3 # FIXED: Updated to latest patch
         with:
           name: linux-packages
           path: |
@@ -125,18 +124,18 @@ jobs:
 
   release:
     needs: [build-linux]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # FIXED: Pinned to specific version
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.8 # FIXED: Updated to latest patch
         with:
           path: artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2 # FIXED: Updated to v2
         with:
           files: |
             artifacts/linux-packages/*
