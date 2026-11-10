@@ -75,7 +75,7 @@ class SPGApp:
         
         # FIXED: Set the window class for Linux taskbar matching
         
-        # FIXED: Correctly locate the icon in PyInstaller bundles
+        # FIXED: Correctly locate the icon and KEEP A REFERENCE to it
         import sys
         if getattr(sys, 'frozen', False):
             bundle_dir = sys._MEIPASS
@@ -85,11 +85,12 @@ class SPGApp:
         icon_path = os.path.join(bundle_dir, "icon.png")
         if os.path.exists(icon_path):
             try:
-                icon_img = tk.PhotoImage(file=icon_path)
-                self.root.iconphoto(True, icon_img)
-            except Exception:
-                pass
-        
+                # Store as self.icon_img to prevent garbage collection
+                self.icon_img = tk.PhotoImage(file=icon_path)
+                self.root.iconphoto(True, self.icon_img)
+            except Exception as e:
+                print(f"Could not load icon: {e}")
+                        
         self.last_generated_password = ""
         self._setup_styles()
 
