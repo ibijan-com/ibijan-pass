@@ -46,22 +46,24 @@ jobs:
         run: |
           mkdir -p package/usr/bin
           mkdir -p package/usr/share/applications
-          mkdir -p package/usr/share/icons/hicolor/256x256/apps
           
           cp dist/ibijan-pass package/usr/bin/ibijan-pass
           
-          if [ -f spg/icon.png ]; then
-            convert spg/icon.png -resize 256x256 package/usr/share/icons/hicolor/256x256/apps/ibijan-pass.png
+          # FIXED: Using install command to ensure folder creation and proper copy
+          if [ ! -f spg/icon.png ]; then
+              echo "ERROR: Application icon not found!"
+              exit 1
           fi
+          install -Dm644 spg/icon.png package/usr/share/icons/hicolor/512x512/apps/ibijan-pass.png
           
-          # FIXED: Using absolute paths to ensure the app launches from the menu
+          # FIXED: Using absolute paths and updated icon name
           cat << 'EOF' > package/usr/share/applications/ibijan-pass.desktop
           [Desktop Entry]
           Version=1.0
           Name=iBijan Pass
           Comment=Memorable Password Generation
           Exec=/usr/bin/ibijan-pass
-          Icon=/usr/share/icons/hicolor/256x256/apps/ibijan-pass.png
+          Icon=ibijan-pass
           Terminal=false
           Type=Application
           Categories=Utility;Security;
@@ -70,6 +72,10 @@ jobs:
           
           fpm -s dir -t deb -n ibijan-pass -v ${{ env.VERSION }} -C package usr/
           fpm -s dir -t rpm -n ibijan-pass -v ${{ env.VERSION }} -C package usr/
+          
+          # Verify icon is in the DEB package
+          echo "Checking DEB package contents..."
+          dpkg-deb --contents ibijan-pass_${{ env.VERSION }}_amd64.deb | grep "usr/share/icons/hicolor/512x512/apps/ibijan-pass.png"
           
       - name: Build AppImage
         run: |
