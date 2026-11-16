@@ -70,7 +70,7 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
-        self.root.minsize(700, 880)
+        self.root.minsize(700, 780) # Reduced from 880 to 780
         self.root.configure(bg="#FFFFFF")
         
         # FIXED: Set the window class for Linux taskbar matching
@@ -342,6 +342,12 @@ class SPGApp:
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="👁️ Preview All", style="Primary.TButton", command=self.show_preview_all_dialog).pack(side="left", padx=5)
         ttk.Button(action_frame, text="🧹 Clear All", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=5)
+                # --- NEW: Security Tip Panel ---
+        tip_frame = tk.Frame(parent, bg="#E8ECFA", bd=1, relief="solid")
+        tip_frame.pack(fill="both", expand=True, pady=(15, 10), padx=10)
+        
+        tk.Label(tip_frame, text="💡 Security Tip", font=("Helvetica", 11, "bold"), fg=BRAND_PRIMARY, bg="#E8ECFA").pack(anchor="w", padx=15, pady=(15, 5))
+        tk.Label(tip_frame, text="Mental Mode relies on your personal pattern. Never share your formula or reuse the exact same prefix for high-security accounts (like banking) and casual accounts.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=600, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
 
     # ==========================================
     # CRYPTOGRAPHIC MODE UI
@@ -406,7 +412,13 @@ class SPGApp:
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_crypto_password_action).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
         ttk.Button(action_frame, text="💾 Save Service", style="Success.TButton", command=self.save_crypto_service_action).pack(side="left", padx=5)
         ttk.Button(action_frame, text="🧹 Clear", style="Neutral.TButton", command=self.clear_crypto_inputs).pack(side="left", padx=5)
-
+                # --- NEW: Security Tip Panel ---
+        tip_frame = tk.Frame(parent, bg="#E8ECFA", bd=1, relief="solid")
+        tip_frame.pack(fill="both", expand=True, pady=(15, 10), padx=10)
+        
+        tk.Label(tip_frame, text="🛡️ Security Note", font=("Helvetica", 11, "bold"), fg=BRAND_PRIMARY, bg="#E8ECFA").pack(anchor="w", padx=15, pady=(15, 5))
+        tk.Label(tip_frame, text="Your Master Secret is mathematically used to generate these passwords. It is NEVER saved to disk. If you forget it, you will permanently lose access to all passwords in this mode.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=600, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
+        
     def update_crypto_combo(self):
         try:
             services = crypto_data_manager.get_services()
