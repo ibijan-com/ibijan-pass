@@ -29,6 +29,23 @@ from .backup import show_export_dialog, show_import_dialog
 from .help import show_comprehensive_help
 
 # ==========================================
+# Helper Function for Account Masking
+# ==========================================
+def mask_account(acct: str) -> str:
+    if not acct:
+        return ""
+    if "@" in acct:
+        name, domain = acct.split("@", 1)
+        if len(name) > 3:
+            return f"{name[:3]}***@{domain}"
+        else:
+            return f"***@{domain}"
+    elif len(acct) > 5:
+        return f"{acct[:3]}***{acct[-2:]}"
+    else:
+        return "***"
+
+# ==========================================
 # Custom UI Component: Placeholder Entry
 # ==========================================
 class PlaceholderEntry(tk.Entry):
@@ -70,12 +87,12 @@ class SPGApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
-        self.root.minsize(700, 780) # Reduced from 880 to 780
+        
+        # Set sensible limits for the window size
+        self.root.minsize(750, 760)
+        self.root.maxsize(1200, 1000) # Allowed more height for maximized view
         self.root.configure(bg="#FFFFFF")
         
-        # FIXED: Set the window class for Linux taskbar matching
-        
-        # FIXED: Correctly locate the icon and KEEP A REFERENCE to it
         import sys
         if getattr(sys, 'frozen', False):
             bundle_dir = sys._MEIPASS
@@ -87,11 +104,9 @@ class SPGApp:
             try:
                 self.icon_img = tk.PhotoImage(file=icon_path)
                 self.root.iconphoto(True, self.icon_img)
-                # FIXED: Force update to apply the icon immediately
-                self.root.update_idletasks()
             except Exception as e:
                 print(f"Could not load icon: {e}")
-                                        
+                        
         self.last_generated_password = ""
         self._setup_styles()
 
@@ -156,7 +171,6 @@ class SPGApp:
         ttk.Button(self.root, text="🔓 Unlock", style="Primary.TButton", command=self.authenticate).pack(pady=(20, 10), ipadx=30, ipady=5)
         self.login_entry.bind("<Return>", lambda e: self.authenticate())
         
-        # FIXED: Moved fg=COLOR_DANGER outside the font tuple
         forgot_btn = tk.Button(self.root, text="Forgot Master Password?", 
                                font=("Helvetica", 9), 
                                fg=COLOR_DANGER, 
@@ -217,25 +231,47 @@ class SPGApp:
         main_frame = tk.Frame(self.root, bg="#FFFFFF", padx=15, pady=15)
         main_frame.pack(fill="both", expand=True)
 
-        # Bottom and Data frames packed first to stay at the bottom
-        bottom_frame = tk.Frame(main_frame, bg="#FFFFFF")
-        bottom_frame.pack(fill="x", side="bottom", pady=(10, 0))
-        
-        data_frame = tk.LabelFrame(main_frame, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        data_frame.pack(fill="x", side="bottom", pady=10)
-        btn_frame = tk.Frame(data_frame, bg="#FFFFFF")
-        btn_frame.pack(pady=10)
-        ttk.Button(btn_frame, text="📤 Export", style="Success.TButton", command=lambda: show_export_dialog(self.root)).pack(side="left", padx=10)
-        ttk.Button(btn_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.after_import_callback)).pack(side="left", padx=10)
+        # --- Bottom 3-Column Layout ---
+        bottom_container = tk.Frame(main_frame, bg="#FFFFFF")
+        bottom_container.pack(fill="x", side="bottom", pady=(10, 0))
 
-        # Header
+        # Column 1: System
+        system_frame = tk.LabelFrame(bottom_container, text=" ⚙️ System ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        system_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        ttk.Button(system_frame, text="📁 Open Config", style="Primary.TButton", command=lambda: open_config_folder(self.root)).pack(pady=(10, 5))
+        ttk.Button(system_frame, text="📍 File Locations", style="Primary.TButton", command=lambda: show_file_locations(self.root)).pack(pady=(0, 10))
+
+        # Column 2: Data Transfer
+        data_frame = tk.LabelFrame(bottom_container, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
+        data_frame.pack(side="left", fill="both", expand=True, padx=5)
+        ttk.Button(data_frame, text="📤 Export", style="Success.TButton", command=lambda: show_export_dialog(self.root)).pack(pady=(10, 5))
+        ttk.Button(data_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.after_import_callback)).pack(pady=(0, 10))
+
+        # Column 3: Delete Data
+        delete_frame = tk.LabelFrame(bottom_container, text=" 🗑️ Delete Data ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=COLOR_DANGER)
+        delete_frame.pack(side="left", fill="both", expand=True, padx=(5, 0))
+        
+        def _clear_vault_action():
+            if messagebox.askyesno("Confirm", "Permanently delete ALL saved passwords?", parent=self.root):
+                success, msg = clear_vault()
+                messagebox.showinfo("Vault", msg, parent=self.root)
+
+        ttk.Button(delete_frame, text="⚠️ Clear Vault", style="Danger.TButton", command=_clear_vault_action).pack(pady=(10, 5))
+        ttk.Button(delete_frame, text="🔥 Factory Reset", style="Danger.TButton", command=lambda: factory_reset(self.root, self.root.destroy)).pack(pady=(0, 10))
+
+        # --- Header ---
         header_frame = tk.Frame(main_frame, bg="#FFFFFF")
         header_frame.pack(fill="x", pady=(0, 10))
-        tk.Label(header_frame, text="🔐 iBijan Pass", font=("Helvetica", 16, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").pack(side="left")
-        ttk.Button(header_frame, text="💡 About", style="Primary.TButton", command=lambda: show_about_dialog(self.root)).pack(side="right", padx=5)
-        ttk.Button(header_frame, text="📚 Help Guide", style="Primary.TButton", command=lambda: show_comprehensive_help(self.root)).pack(side="right")
+        header_frame.columnconfigure(1, weight=1) # Spacer to push buttons to the right
+        
+        tk.Label(header_frame, text="🔐 iBijan Pass", font=("Helvetica", 16, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").grid(row=0, column=0, sticky="w")
+        
+        header_btn_frame = tk.Frame(header_frame, bg="#FFFFFF")
+        header_btn_frame.grid(row=0, column=2, sticky="e")
+        ttk.Button(header_btn_frame, text="💡 About", style="Primary.TButton", command=lambda: show_about_dialog(self.root)).pack(side="left", padx=5)
+        ttk.Button(header_btn_frame, text="📚 Help Guide", style="Primary.TButton", command=lambda: show_comprehensive_help(self.root)).pack(side="left")
 
-        # Notebook (Tabs)
+        # --- Notebook ---
         self.notebook = ttk.Notebook(main_frame)
         self.notebook.pack(fill="both", expand=True, pady=(0, 10))
 
@@ -249,150 +285,190 @@ class SPGApp:
 
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_change)
 
-        # Bottom Buttons
-        ttk.Button(bottom_frame, text="📁 Open Config", style="Primary.TButton", command=lambda: open_config_folder(self.root)).pack(side="left", padx=2)
-        ttk.Button(bottom_frame, text="📍 File Locations", style="Primary.TButton", command=lambda: show_file_locations(self.root)).pack(side="left", padx=2)
-        
-        def _clear_vault_action():
-            if messagebox.askyesno("Confirm", "Permanently delete ALL saved passwords?", parent=self.root):
-                success, msg = clear_vault()
-                messagebox.showinfo("Vault", msg, parent=self.root)
-
-        ttk.Button(bottom_frame, text="⚠️ Clear Vault", style="Danger.TButton", command=_clear_vault_action).pack(side="right", padx=(2, 10))
-        ttk.Button(bottom_frame, text="🔥 Factory Reset", style="Danger.TButton", command=lambda: factory_reset(self.root, self.root.destroy)).pack(side="right", padx=2)
-
     def on_tab_change(self, event):
-        """Clear the Master Secret if the user switches tabs to prevent accidental leaks."""
         if hasattr(self, 'crypto_master_secret_entry'):
             self.crypto_master_secret_entry.delete(0, tk.END)
 
     # ==========================================
-    # MENTAL MODE UI
+    # MENTAL MODE UI (Balanced Grid, Filled Space)
     # ==========================================
     def build_mental_mode_ui(self, parent):
+        # --- Frame 1: Saved Patterns ---
         profile_frame = tk.LabelFrame(parent, text=" 📁 Saved Patterns ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        profile_frame.pack(fill="x", pady=(10, 5))
+        profile_frame.pack(fill="x", pady=(10, 5), padx=10)
+        
+        profile_frame.columnconfigure(1, weight=1)
 
-        tk.Label(profile_frame, text="Select Pattern:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10)
+        tk.Label(profile_frame, text="Select Pattern:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10, sticky="w")
         self.profile_var = tk.StringVar()
-        self.profile_combo = ttk.Combobox(profile_frame, textvariable=self.profile_var, width=30, state="readonly")
-        self.profile_combo.grid(row=0, column=1, padx=5, pady=10)
+        self.profile_combo = ttk.Combobox(profile_frame, textvariable=self.profile_var, width=20, state="readonly")
+        self.profile_combo.grid(row=0, column=1, padx=5, pady=10, sticky="we")
         self.update_profile_combo()
         
-        btn_load = ttk.Button(profile_frame, text="📥 Load Pattern", style="Primary.TButton", command=self.load_selected_profile)
-        btn_load.grid(row=0, column=2, padx=2)
+        profile_btn_frame = tk.Frame(profile_frame, bg="#FFFFFF")
+        profile_btn_frame.grid(row=0, column=2, padx=5, sticky="e")
+        
+        btn_load = ttk.Button(profile_btn_frame, text="📥 Load Pattern", style="Primary.TButton", command=self.load_selected_profile)
+        btn_load.pack(side="left", padx=2)
         ToolTip(btn_load, "Load the selected pattern to quickly generate a new password.")
 
-        ttk.Button(profile_frame, text="🗑️ Delete Pattern", style="Danger.TButton", command=self.delete_selected_profile).grid(row=0, column=3, padx=2)
+        ttk.Button(profile_btn_frame, text="🗑️ Delete Pattern", style="Danger.TButton", command=self.delete_selected_profile).pack(side="left", padx=2)
 
-        hint_label = tk.Label(parent, text="Hint: Save your base components as a Pattern. Load it, then just change the Service Name for each new service.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF")
-        hint_label.pack(fill="x", pady=(0, 10))
-
+        # --- Frame 2: Password Settings ---
         settings_frame = tk.LabelFrame(parent, text=" 🔧 Password Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        settings_frame.pack(fill="x", pady=(0, 15))
+        settings_frame.pack(fill="x", pady=(0, 5), padx=10)
         
+        settings_frame.columnconfigure(1, weight=1)
+        settings_frame.columnconfigure(3, weight=1)
+
         vcmd_pref = (self.root.register(validate_prefix), '%P')
         vcmd_base = (self.root.register(validate_base_number), '%P')
         vcmd_spec = (self.root.register(validate_special_chars), '%P')
         vcmd_svc = (self.root.register(validate_service_name), '%P')
         vcmd_cap = (self.root.register(validate_capitalize_letter), '%P')
 
+        # Row 0: Pattern Name
         tk.Label(settings_frame, text="Pattern Name:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.profile_name_entry = PlaceholderEntry(settings_frame, placeholder="e.g., MyBasePattern", width=25)
-        self.profile_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
-        ttk.Button(settings_frame, text="💾 Save Pattern", style="Success.TButton", command=self.save_current_profile).grid(row=0, column=2, padx=10)
+        self.profile_name_entry = PlaceholderEntry(settings_frame, placeholder="e.g., MyBasePattern", width=20)
+        self.profile_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="we")
+        ttk.Button(settings_frame, text="💾 Save Pattern", style="Success.TButton", command=self.save_current_profile).grid(row=0, column=2, padx=5, pady=5, sticky="w")
 
-        self.require_master_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(settings_frame, text="🔒 Require Master Password to load this pattern", variable=self.require_master_var, bg="#FFFFFF").grid(row=1, column=0, columnspan=3, sticky="w", padx=5, pady=5)
+        # Row 1: Prefix | Service Name
+        tk.Label(settings_frame, text="Prefix:", bg="#FFFFFF").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        self.prefix_entry = PlaceholderEntry(settings_frame, placeholder="e.g., London", width=20, validate="key", validatecommand=vcmd_pref)
+        self.prefix_entry.grid(row=1, column=1, padx=5, pady=5, sticky="we")
 
-        tk.Label(settings_frame, text="Prefix:", bg="#FFFFFF").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.prefix_entry = PlaceholderEntry(settings_frame, placeholder="e.g., London", width=25, validate="key", validatecommand=vcmd_pref)
-        self.prefix_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
-
-        tk.Label(settings_frame, text="Base Number:", bg="#FFFFFF").grid(row=3, column=0, sticky="w", padx=5, pady=5)
-        self.base_entry = PlaceholderEntry(settings_frame, placeholder="e.g., 100", width=25, validate="key", validatecommand=vcmd_base)
-        self.base_entry.grid(row=3, column=1, padx=5, pady=5, sticky="w")
-
-        tk.Label(settings_frame, text="Special Characters:", bg="#FFFFFF").grid(row=4, column=0, sticky="w", padx=5, pady=5)
-        self.special_entry = PlaceholderEntry(settings_frame, placeholder="e.g., @#!", width=25, validate="key", validatecommand=vcmd_spec)
-        self.special_entry.grid(row=4, column=1, padx=5, pady=5, sticky="w")
-
-        tk.Label(settings_frame, text="Service Name:", bg="#FFFFFF").grid(row=5, column=0, sticky="w", padx=5, pady=5)
-        self.service_entry = PlaceholderEntry(settings_frame, placeholder="e.g., google", width=25, validate="key", validatecommand=vcmd_svc)
-        self.service_entry.grid(row=5, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(settings_frame, text="Service Name:", bg="#FFFFFF").grid(row=1, column=2, sticky="w", padx=15, pady=5)
+        self.service_entry = PlaceholderEntry(settings_frame, placeholder="e.g., google", width=20, validate="key", validatecommand=vcmd_svc)
+        self.service_entry.grid(row=1, column=3, padx=5, pady=5, sticky="we")
         self.service_entry.bind("<Return>", lambda e: self.generate_password())
 
-        tk.Label(settings_frame, text="Capitalize Letter(s):", bg="#FFFFFF").grid(row=6, column=0, sticky="w", padx=5, pady=5)
-        self.capitalize_entry = PlaceholderEntry(settings_frame, placeholder="e.g., G or GM", width=25, validate="key", validatecommand=vcmd_cap)
-        self.capitalize_entry.grid(row=6, column=1, padx=5, pady=5, sticky="w")
+        # Row 2: Base Number | Capitalize Letter
+        tk.Label(settings_frame, text="Base Number:", bg="#FFFFFF").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.base_entry = PlaceholderEntry(settings_frame, placeholder="e.g., 100", width=20, validate="key", validatecommand=vcmd_base)
+        self.base_entry.grid(row=2, column=1, padx=5, pady=5, sticky="we")
 
-        tk.Label(settings_frame, text="Pattern:", bg="#FFFFFF").grid(row=7, column=0, sticky="w", padx=5, pady=10)
+        tk.Label(settings_frame, text="Capitalize Letter(s):", bg="#FFFFFF").grid(row=2, column=2, sticky="w", padx=15, pady=5)
+        self.capitalize_entry = PlaceholderEntry(settings_frame, placeholder="e.g., G or GM", width=20, validate="key", validatecommand=vcmd_cap)
+        self.capitalize_entry.grid(row=2, column=3, padx=5, pady=5, sticky="we")
+
+        # Row 3: Pattern | Special Characters
+        tk.Label(settings_frame, text="Pattern:", bg="#FFFFFF").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.pattern_var = tk.StringVar(value=DEFAULT_PATTERN)
-        ttk.Combobox(settings_frame, textvariable=self.pattern_var, values=list(PASSWORD_PATTERNS.keys()), width=40, state="readonly").grid(row=7, column=1, columnspan=2, sticky="w", padx=5)
+        
+        self.pattern_combo = ttk.Combobox(settings_frame, textvariable=self.pattern_var, values=list(PASSWORD_PATTERNS.keys()), width=20, state="readonly", font=("Helvetica", 9))
+        self.pattern_combo.grid(row=3, column=1, padx=5, pady=5, sticky="we")
+        
+        pattern_tooltip = ToolTip(self.pattern_combo, "")
+        def update_pattern_tooltip(event=None):
+            pattern_tooltip.text = f"Selected Pattern:\n{self.pattern_var.get()}"
+        
+        self.pattern_combo.bind("<Enter>", update_pattern_tooltip)
+        self.pattern_combo.bind("<<ComboboxSelected>>", update_pattern_tooltip)
 
-        tk.Label(settings_frame, text="Note (Optional):", bg="#FFFFFF").grid(row=8, column=0, sticky="w", padx=5, pady=5)
-        self.note_entry = PlaceholderEntry(settings_frame, placeholder="e.g., Work Email Account", width=40)
-        self.note_entry.grid(row=8, column=1, columnspan=2, padx=5, pady=5, sticky="w")
+        tk.Label(settings_frame, text="Special Characters:", bg="#FFFFFF").grid(row=3, column=2, sticky="w", padx=15, pady=5)
+        self.special_entry = PlaceholderEntry(settings_frame, placeholder="e.g., @#!", width=20, validate="key", validatecommand=vcmd_spec)
+        self.special_entry.grid(row=3, column=3, padx=5, pady=5, sticky="we")
 
+        self.pattern_preview_lbl = tk.Label(settings_frame, text=self.pattern_var.get(), font=("Helvetica", 8, "italic"), fg=BRAND_PRIMARY, bg="#FFFFFF", wraplength=200, justify="left")
+        self.pattern_preview_lbl.grid(row=4, column=1, sticky="w", padx=5, pady=(0, 5))
+        
+        self.pattern_var.trace_add("write", lambda *args: self.pattern_preview_lbl.config(text=self.pattern_var.get()))
+
+        # Row 5: Note (spanning)
+        tk.Label(settings_frame, text="Note (Optional):", bg="#FFFFFF").grid(row=5, column=0, sticky="w", padx=5, pady=5)
+        self.note_entry = PlaceholderEntry(settings_frame, placeholder="e.g., Work Email Account", width=50)
+        self.note_entry.grid(row=5, column=1, columnspan=3, padx=5, pady=5, sticky="we")
+
+        # Row 6: Require Master Password
+        self.require_master_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(settings_frame, text="🔒 Require Master Password to load this pattern", variable=self.require_master_var, bg="#FFFFFF").grid(row=6, column=0, columnspan=4, sticky="w", padx=5, pady=(10, 5))
+
+        # --- Frame 3: Actions ---
         action_frame = tk.Frame(parent, bg="#FFFFFF")
-        action_frame.pack(fill="x", pady=10)
+        action_frame.pack(fill="x", pady=10, padx=10)
 
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_password).pack(side="left", padx=(0, 5), ipadx=5, ipady=5)
         ttk.Button(action_frame, text="💾 Save to Vault", style="Success.TButton", command=self.save_to_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="📋 View Vault", style="Primary.TButton", command=self.view_vault).pack(side="left", padx=5)
         ttk.Button(action_frame, text="👁️ Preview All", style="Primary.TButton", command=self.show_preview_all_dialog).pack(side="left", padx=5)
-        ttk.Button(action_frame, text="🧹 Clear All", style="Neutral.TButton", command=self.clear_inputs).pack(side="left", padx=5)
-                # --- NEW: Security Tip Panel ---
+        ttk.Button(action_frame, text="🧹 Clear All", style="Danger.TButton", command=self.clear_inputs).pack(side="left", padx=5)
+
+        # --- Frame 4: Security Tip ---
         tip_frame = tk.Frame(parent, bg="#E8ECFA", bd=1, relief="solid")
-        tip_frame.pack(fill="both", expand=True, pady=(15, 10), padx=10)
+        tip_frame.pack(fill="both", expand=True, pady=(5, 10), padx=10)
         
         tk.Label(tip_frame, text="💡 Security Tip", font=("Helvetica", 11, "bold"), fg=BRAND_PRIMARY, bg="#E8ECFA").pack(anchor="w", padx=15, pady=(15, 5))
-        tk.Label(tip_frame, text="Mental Mode relies on your personal pattern. Never share your formula or reuse the exact same prefix for high-security accounts (like banking) and casual accounts.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=600, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
+        tk.Label(tip_frame, text="Mental Mode relies on your personal pattern. Never share your formula or reuse the exact same prefix for high-security accounts (like banking) and casual accounts.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=650, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
 
     # ==========================================
-    # CRYPTOGRAPHIC MODE UI
+    # CRYPTOGRAPHIC MODE UI (Expanding Fields)
     # ==========================================
     def build_crypto_mode_ui(self, parent):
         top_frame = tk.Frame(parent, bg="#FFFFFF")
-        top_frame.pack(fill="x", pady=(10, 5))
+        top_frame.pack(fill="x", pady=(10, 5), padx=10)
         
         tk.Label(top_frame, text="Cryptographic Mode generates site-specific passwords from a Master Secret without saving them.", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(anchor="w", padx=5)
 
-        # Saved Services Frame
+        # --- Frame 1: Saved Services ---
         service_frame = tk.LabelFrame(parent, text=" 🔐 Saved Services ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        service_frame.pack(fill="x", pady=(5, 10))
+        service_frame.pack(fill="x", pady=(5, 5), padx=10)
+        
+        service_frame.columnconfigure(1, weight=1) # Allow Combo to expand
 
-        tk.Label(service_frame, text="Load Service:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10)
+        tk.Label(service_frame, text="Load Service:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10, sticky="w")
         self.crypto_service_var = tk.StringVar()
-        self.crypto_service_combo = ttk.Combobox(service_frame, textvariable=self.crypto_service_var, width=30, state="readonly")
-        self.crypto_service_combo.grid(row=0, column=1, padx=5, pady=10)
+        self.crypto_service_combo = ttk.Combobox(service_frame, textvariable=self.crypto_service_var, width=20, state="readonly")
+        self.crypto_service_combo.grid(row=0, column=1, padx=5, pady=10, sticky="we")
         self.update_crypto_combo()
         
-        ttk.Button(service_frame, text="📥 Load", style="Primary.TButton", command=self.load_crypto_service).grid(row=0, column=2, padx=2)
-        ttk.Button(service_frame, text="🗑️ Delete", style="Danger.TButton", command=self.delete_crypto_service).grid(row=0, column=3, padx=2)
+        ttk.Button(service_frame, text="📥 Load", style="Primary.TButton", command=self.load_crypto_service).grid(row=0, column=2, padx=2, sticky="w")
+        ttk.Button(service_frame, text="🗑️ Delete", style="Danger.TButton", command=self.delete_crypto_service).grid(row=0, column=3, padx=2, sticky="w")
 
-        # Settings Frame
+        # --- Frame 2: Generation Settings ---
         settings_frame = tk.LabelFrame(parent, text=" ⚙️ Generation Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        settings_frame.pack(fill="x", pady=(0, 15))
+        settings_frame.pack(fill="x", pady=(0, 5), padx=10)
+        
+        settings_frame.columnconfigure(1, weight=1) # Allow fields to expand
 
-        # Master Secret (Masked)
+        # Row 0: Master Secret
         tk.Label(settings_frame, text="Master Secret:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.crypto_master_secret_entry = tk.Entry(settings_frame, width=30, show="*")
-        self.crypto_master_secret_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self.crypto_master_secret_entry = tk.Entry(settings_frame, width=20, show="*")
+        self.crypto_master_secret_entry.grid(row=0, column=1, padx=5, pady=5, sticky="we")
 
+        # Row 1: Service Name
         tk.Label(settings_frame, text="Service Name:", bg="#FFFFFF").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.crypto_svc_entry = PlaceholderEntry(settings_frame, placeholder="e.g., google", width=30)
-        self.crypto_svc_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        self.crypto_svc_entry = PlaceholderEntry(settings_frame, placeholder="e.g., google", width=20)
+        self.crypto_svc_entry.grid(row=1, column=1, padx=5, pady=5, sticky="we")
 
+        # Row 2: Account/Username
         tk.Label(settings_frame, text="Account/Username:", bg="#FFFFFF").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.crypto_acct_entry = PlaceholderEntry(settings_frame, placeholder="e.g., user@email.com", width=30)
-        self.crypto_acct_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+        
+        acct_frame = tk.Frame(settings_frame, bg="#FFFFFF")
+        acct_frame.grid(row=2, column=1, padx=5, pady=5, sticky="we")
+        
+        self.crypto_acct_entry = tk.Entry(acct_frame, width=20)
+        self.crypto_acct_entry.pack(side="left", fill="x", expand=True)
+        
+        self.acct_visible = False
+        def toggle_acct_visibility():
+            self.acct_visible = not self.acct_visible
+            if self.acct_visible:
+                self.crypto_acct_entry.config(show="")
+                eye_btn.config(text="👁️")
+            else:
+                self.crypto_acct_entry.config(show="*")
+                eye_btn.config(text="👁️‍🗨️")
+                
+        eye_btn = tk.Button(acct_frame, text="👁️‍🗨️", command=toggle_acct_visibility, relief="flat", bg="#FFFFFF", cursor="hand2")
+        eye_btn.pack(side="left", padx=(2, 0))
 
+        # Row 3: Password Length
         tk.Label(settings_frame, text="Password Length:", bg="#FFFFFF").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.crypto_length_var = tk.IntVar(value=16)
         tk.Spinbox(settings_frame, from_=4, to=128, textvariable=self.crypto_length_var, width=5).grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
-        # Checkboxes for policies
+        # Row 4: Checkboxes
         self.crypto_upper_var = tk.BooleanVar(value=True)
         self.crypto_lower_var = tk.BooleanVar(value=True)
         self.crypto_digits_var = tk.BooleanVar(value=True)
@@ -405,30 +481,36 @@ class SPGApp:
         tk.Checkbutton(policy_frame, text="Digits", variable=self.crypto_digits_var, bg="#FFFFFF").pack(side="left", padx=5)
         tk.Checkbutton(policy_frame, text="Symbols", variable=self.crypto_symbols_var, bg="#FFFFFF").pack(side="left", padx=5)
 
-        # Actions
+        # --- Frame 3: Actions ---
         action_frame = tk.Frame(parent, bg="#FFFFFF")
-        action_frame.pack(fill="x", pady=10)
+        action_frame.pack(fill="x", pady=10, padx=10)
 
         ttk.Button(action_frame, text="🔐 Generate", style="Primary.TButton", command=self.generate_crypto_password_action).pack(side="left", padx=(0, 10), ipadx=10, ipady=5)
         ttk.Button(action_frame, text="💾 Save Service", style="Success.TButton", command=self.save_crypto_service_action).pack(side="left", padx=5)
-        ttk.Button(action_frame, text="🧹 Clear", style="Neutral.TButton", command=self.clear_crypto_inputs).pack(side="left", padx=5)
-                # --- NEW: Security Tip Panel ---
+        ttk.Button(action_frame, text="🧹 Clear", style="Danger.TButton", command=self.clear_crypto_inputs).pack(side="left", padx=5)
+
+        # --- Frame 4: Security Note ---
         tip_frame = tk.Frame(parent, bg="#E8ECFA", bd=1, relief="solid")
-        tip_frame.pack(fill="both", expand=True, pady=(15, 10), padx=10)
+        tip_frame.pack(fill="both", expand=True, pady=(5, 10), padx=10)
         
         tk.Label(tip_frame, text="🛡️ Security Note", font=("Helvetica", 11, "bold"), fg=BRAND_PRIMARY, bg="#E8ECFA").pack(anchor="w", padx=15, pady=(15, 5))
-        tk.Label(tip_frame, text="Your Master Secret is mathematically used to generate these passwords. It is NEVER saved to disk. If you forget it, you will permanently lose access to all passwords in this mode.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=600, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
-        
+        tk.Label(tip_frame, text="Your Master Secret is mathematically used to generate these passwords. It is NEVER saved to disk. If you forget it, you will permanently lose access to all passwords in this mode.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=650, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
+
+
+    # ==========================================
+    # LOGIC FUNCTIONS
+    # ==========================================
     def update_crypto_combo(self):
         try:
             services = crypto_data_manager.get_services()
             display_names = []
-            self._crypto_key_map = {} # Map display names to actual SHA256 keys
+            self._crypto_key_map = {}
             
             for key, data in services.items():
                 svc = data.get("service_name", "")
                 acct = data.get("account", "")
-                display_str = f"{svc} | {acct}" if acct else svc
+                masked_acct = mask_account(acct)
+                display_str = f"{svc} | {masked_acct}" if acct else svc
                 display_names.append(display_str)
                 self._crypto_key_map[display_str] = key
             
@@ -454,7 +536,6 @@ class SPGApp:
             self.crypto_svc_entry.delete(0, tk.END)
             self.crypto_svc_entry.insert(0, data.get("service_name", ""))
             
-            self.crypto_acct_entry._clear_placeholder()
             self.crypto_acct_entry.delete(0, tk.END)
             self.crypto_acct_entry.insert(0, data.get("account", ""))
             
@@ -482,7 +563,7 @@ class SPGApp:
     def generate_crypto_password_action(self):
         secret = self.crypto_master_secret_entry.get()
         svc = self.crypto_svc_entry.get_value().strip()
-        acct = self.crypto_acct_entry.get_value().strip()
+        acct = self.crypto_acct_entry.get().strip()
         
         if not secret or not svc:
             messagebox.showerror("Error", "Master Secret and Service Name are required.", parent=self.root)
@@ -491,16 +572,13 @@ class SPGApp:
         from .crypto_storage import _get_key
         key = _get_key(svc, acct)
         
-        # Check if we have a saved salt for this service
         saved_data = load_crypto_service(key)
         if saved_data and saved_data.get("salt"):
             salt = decode_salt(saved_data["salt"])
         else:
-            # Generate a new salt if this is a brand new service
             salt = generate_salt()
             salt_b64 = encode_salt(salt)
             
-            # FIXED: Updated arguments to match new crypto_storage signature
             save_crypto_service(
                 service_name=svc,
                 account=acct,
@@ -516,7 +594,6 @@ class SPGApp:
             self.update_crypto_combo()
 
         try:
-            # FIXED: Changed 'version=1' to 'password_revision=1'
             pw = generate_crypto_password(
                 master_secret=secret,
                 salt=salt,
@@ -535,9 +612,10 @@ class SPGApp:
             
         except Exception as e:
             messagebox.showerror("Error", str(e), parent=self.root)
+
     def save_crypto_service_action(self):
         svc = self.crypto_svc_entry.get_value().strip()
-        acct = self.crypto_acct_entry.get_value().strip()
+        acct = self.crypto_acct_entry.get().strip()
         
         if not svc:
             messagebox.showerror("Error", "Service Name is required.", parent=self.root)
@@ -546,14 +624,12 @@ class SPGApp:
         from .crypto_storage import _get_key
         key = _get_key(svc, acct)
         
-        # Check if it already exists
         saved_data = load_crypto_service(key)
         if saved_data:
             salt_b64 = saved_data["salt"]
         else:
             salt_b64 = encode_salt(generate_salt())
             
-        # FIXED: Updated arguments to match new crypto_storage signature
         success, msg = save_crypto_service(
             service_name=svc,
             account=acct,
@@ -578,9 +654,7 @@ class SPGApp:
         self.crypto_svc_entry._clear_placeholder()
         self.crypto_svc_entry.delete(0, tk.END)
         self.crypto_svc_entry._add_placeholder()
-        self.crypto_acct_entry._clear_placeholder()
         self.crypto_acct_entry.delete(0, tk.END)
-        self.crypto_acct_entry._add_placeholder()
         self.crypto_length_var.set(16)
         self.crypto_upper_var.set(True)
         self.crypto_lower_var.set(True)
@@ -588,7 +662,7 @@ class SPGApp:
         self.crypto_symbols_var.set(True)
 
     # ==========================================
-    # MENTAL MODE LOGIC (Unchanged)
+    # MENTAL MODE LOGIC
     # ==========================================
     def update_profile_combo(self):
         try:

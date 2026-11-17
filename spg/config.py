@@ -11,7 +11,7 @@ import os
 # Application metadata
 # ============================================================
 APP_NAME = "iBijan Pass" 
-APP_VERSION = "1.1.8"
+APP_VERSION = "1.1.10"
 APP_AUTHOR = "iBijan"
 APP_WEBSITE = "https://ibijan.com"
 APP_DESCRIPTION = "Offline, encrypted password generator with custom patterns"

@@ -1,81 +1,96 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [v1.1.10] - 2026-11-18
+
+*This is the first officially supported stable release of iBijan Pass. Previous releases in the v1.1.x series were development/pre-release builds.*
+
+### Added
+- **Privacy Masking:** Account identifiers in the Cryptographic Mode Saved Services list are now masked by default (e.g., `bij***@gmail.com`). Added a visibility toggle to reveal or hide the account identifier in the input field.
+- **Security Tips Panels:** Added contextual security notices to both tabs to educate users about pattern reuse and Master Secret management.
+- **Pattern Tooltip:** Added a dynamic tooltip and a preview label below the Pattern dropdown to prevent text truncation.
+
+### Changed
+- **UI/UX Layout Overhaul:** Reorganized the Mental Mode settings into a balanced two-column grid. Moved System, Data Transfer, and Data Management actions into three distinct columns at the bottom for better visual organization.
+- **Application Icon:** Added a custom application icon with a transparent background. Improved application icon and title integration across supported Linux desktop environments.
+- **Cryptographic Mode Stabilization:** Refined and stabilized the deterministic, site-specific password generation system introduced in v1.1.0, using a Master Secret, `scrypt`, and HMAC-SHA256. Generated passwords are not stored by the application.
+
+### Security & Architecture
+- **KDF Parameter Versioning:** Added explicit versioning and storage of `scrypt` parameters in `key.key` and `.ibpass` backup files, enabling the application to identify and correctly process supported KDF configurations.
+- **Removed Legacy Hash:** Removed the legacy standalone SHA-256 master-password hash. Master-password verification and key derivation now use the `scrypt`-based architecture.
+- **Transactional Backup Import:** Improved backup import with validation, staged file updates, and rollback handling to reduce the risk of partial data replacement.
+
+### Fixed
+- Fixed the `Ctrl+A` (Select All) key binding on Linux/X11 systems.
+- Fixed issues with application window class identification and desktop integration on Linux.
+
+---
+
 ## [v1.1.0] - 2026-10-29
 
-### ✨ New Features
-- **Cryptographic Mode:** Introduced a highly secure, deterministic password generator based on HMAC-SHA256 and a Master Secret. It generates site-specific passwords without saving them to the database.
-- **Multi-Account Support:** You can now save multiple accounts per service in Cryptographic Mode (e.g., `google | work@gmail.com` and `google | personal@gmail.com`).
-- **Forgot Password Button:** Added a "Forgot Master Password?" link to the login screen to guide users through a secure Factory Reset if they lose their password.
+### Added
+- **Cryptographic Mode (Pre-release):** Introduced a deterministic, site-specific password generator using a Master Secret, `scrypt`, and HMAC-SHA256. Generated passwords are not stored by the application.
+- **Multi-Account Support:** Added support for saving multiple accounts per service in Cryptographic Mode.
+- **Forgot Master Password:** Added a "Forgot Master Password?" option to the login screen to guide users through a Factory Reset.
 
-### 🛡️ Major Security & Reliability Overhaul
-- **Atomic File Writes:** All data is now written to secure temporary files and atomically replaced. This prevents data corruption if the app crashes or power is lost.
-- **Transactional Backup Import:** Importing a backup is now fully transactional. If restoring one section (e.g., Vault) fails, all changes are rolled back, and your existing data remains untouched.
-- **Cryptographic State Machine:** The app now refuses to start if the encryption key is missing but encrypted data exists, preventing accidental data overwrites.
-- **Independent Input Validation:** Password generation enforces strict character and length rules internally.
-- **Removed Fast SHA-256 Hash:** Authentication now relies entirely on the secure `scrypt` KDF.
-- **Backup Integrity:** Backups now strictly require a password, and corrupted Vault files will halt the export process instead of creating incomplete backups.
-
-### 💅 UI/UX Improvements
-- Completely redesigned the UI with a tabbed interface to separate Mental Mode and Cryptographic Mode.
-- Updated the `Help Guide` with comprehensive instructions for both modes.
-- Changed the default backup file extension to `.ibpass`.
-
-### ⚠️ Breaking Changes
-- Due to the new atomic storage and KDF architecture, this version cannot read local files created by versions `1.0.2` and older. Users MUST export a backup from the old version and import it into the new version.
+### Security & Reliability
+- **Independent Input Validation:** Password generation now enforces character and length restrictions internally, independently of UI validation.
+- **Backup Integrity:** Backups now require a password, and corrupted Vault files prevent the export process from proceeding.
 
 ---
 
 ## [v1.0.2] - 2026-10-28
+
 ### Changed
-- Renamed "Profiles" to "Saved Patterns" across the UI to align with the app's philosophy.
-- Added an instructional hint text below the pattern selection area.
+- Renamed "Profiles" to "Saved Patterns" throughout the application UI.
+- Added an instructional hint below the Saved Patterns selection area.
 
 ---
 
 ## [v1.0.1] - 2026-10-27
+
 ### Added
-- Bulk Delete in Vault: Added multi-select capability (`Ctrl+A` or `Shift+Click`) to delete multiple saved passwords at once.
-- Capitalization Upgrade: The "Capitalize Letter(s)" input now accepts up to 3 characters.
+- **Bulk Delete in Vault:** Added multi-selection support for deleting multiple saved passwords at once.
+- **Capitalization Upgrade:** Expanded the "Capitalize Letter(s)" input to accept up to three characters.
+
+### Changed
+- Removed the redundant Quotation feature.
+
 ### Fixed
-- Removed the redundant "Quotation" feature.
-- Fixed a critical bug where profiles were not being saved to disk due to missing file write logic.
+- Fixed a critical bug that prevented profiles from being saved to disk due to missing file-write logic.
 
 ---
 
 ## [v1.0.0] - 2026-10-27
-### 🛡️ MAJOR SECURITY UPGRADE
-- **True Master Password Architecture:** Implemented `scrypt` KDF.
-- **Secure Portable Backups:** Backup files (.ibpass) are now encrypted using `scrypt` and a unique salt.
-- **File System Permissions:** Sensitive files now have strict `0600` permissions.
-- **Atomic File Writes:** Data is written to temporary files first.
-- **Data Loss Prevention:** The application will now refuse to overwrite or reset data if the encryption key is missing or corrupted.
 
-### ⚠️ Breaking Changes
-- Due to the new KDF architecture, this version cannot read files created by versions 0.9.3 and older. Users must perform a Factory Reset and restore their data using a `.ibpass` backup file.
+### Security
+- **Master Password Architecture:** Implemented a `scrypt`-based Key Derivation Function (KDF) for master-password-based key derivation.
+- **Encrypted Portable Backups:** Introduced portable `.ibpass` backup files encrypted using `scrypt` and a unique salt.
+- **File System Permissions:** Applied restrictive `0600` permissions to sensitive files on supported POSIX systems.
+- **Atomic File Writes:** Implemented atomic file replacement using temporary files to reduce the risk of data corruption during writes.
+- **Data Loss Prevention:** Added safeguards to prevent the application from overwriting or resetting existing encrypted data when its encryption key is missing.
 
 ---
 
 ## [v0.9.3] - 2026-10-27
-### Added
-- **New Branding Tagline:** Updated the UI to reflect "Memorable Password Generation" and "A personal-pattern approach".
-- **Updated Title Bar:** The main window title now dynamically shows the new tagline.
 
-### UI/UX Improvements
-- Changed the default backup file extension from `.spg` to `.ibpass` to align with the branding.
-- Updated README and installation instructions for the new version.
+### Added
+- **Branding Tagline:** Updated the application branding to use "Memorable Password Generation".
+- **Dynamic Window Title:** Updated the main window title to display the new branding tagline.
 
 ---
 
 ## [v0.9.2] - 2026-10-26
+
 ### Added
-- **Portable Backups:** Replaced complex encryption keys with an optional backup password. Backup files can now be imported on ANY computer, even after a Factory Reset.
-- **Auto-Load Profile:** The application now automatically loads the first profile immediately after a successful import.
+- **Portable Backups:** Introduced portable backup files using an optional backup password.
+- **Auto-Load Profile:** Added automatic loading of the first available profile after a successful backup import.
 
 ### Fixed
-- Fixed an issue where the Vault encryption key would mismatch after importing a backup from another system.
-- Fixed custom error dialogs to prevent them from being resizable.
-- Fixed the application to automatically restart after performing a Factory Reset.
-- Fixed YAML syntax error in GitHub Actions workflow.
-
-### UI/UX Improvements
-- Added clearer error messages for invalid backup passwords.
+- Fixed an issue that caused the Vault encryption key to become mismatched after importing a backup.
+- Fixed custom error dialogs to prevent them from being resized.
+- Fixed the application to restart automatically after a Factory Reset.
