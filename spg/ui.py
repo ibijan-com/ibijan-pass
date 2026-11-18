@@ -88,9 +88,9 @@ class SPGApp:
         self.root = root
         self.root.title(f"iBijan Pass v{APP_VERSION} - Memorable Password Generation")
         
-        # Set sensible limits for the window size
-        self.root.minsize(750, 760)
-        self.root.maxsize(1200, 1000) # Allowed more height for maximized view
+        # Reduced minsize since bottom section is gone
+        self.root.minsize(720, 680)
+        self.root.maxsize(1000, 900)
         self.root.configure(bg="#FFFFFF")
         
         import sys
@@ -109,6 +109,9 @@ class SPGApp:
                         
         self.last_generated_password = ""
         self._setup_styles()
+        
+        # Build Menu Bar
+        self._build_menu()
 
         self.root.bind_class("Entry", "<Control-a>", self._select_all)
         self.root.bind_class("Entry", "<Control-A>", self._select_all)
@@ -117,6 +120,39 @@ class SPGApp:
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.check_authentication()
+
+    def _build_menu(self):
+        menubar = tk.Menu(self.root)
+        
+        # File Menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Export Data...", command=lambda: show_export_dialog(self.root))
+        file_menu.add_command(label="Import Data...", command=lambda: show_import_dialog(self.root, self.after_import_callback))
+        file_menu.add_separator()
+        file_menu.add_command(label="Open Config Folder", command=lambda: open_config_folder(self.root))
+        file_menu.add_command(label="File Locations", command=lambda: show_file_locations(self.root)) # Moved here
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_closing)
+        menubar.add_cascade(label="File", menu=file_menu)
+        
+        # Tools Menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        tools_menu.add_command(label="Clear Vault", command=self._clear_vault_action)
+        tools_menu.add_command(label="Factory Reset", command=lambda: factory_reset(self.root, self.root.destroy))
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        
+        # Help Menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Help Guide", command=lambda: show_comprehensive_help(self.root))
+        help_menu.add_command(label="About iBijan Pass", command=lambda: show_about_dialog(self.root))
+        menubar.add_cascade(label="Help", menu=help_menu)
+        
+        self.root.config(menu=menubar)
+        
+    def _clear_vault_action(self):
+        if messagebox.askyesno("Confirm", "Permanently delete ALL saved passwords?", parent=self.root):
+            success, msg = clear_vault()
+            messagebox.showinfo("Vault", msg, parent=self.root)
 
     def on_closing(self):
         lock_fernet()
@@ -145,7 +181,9 @@ class SPGApp:
 
     def clear_screen(self):
         for widget in self.root.winfo_children():
-            widget.destroy()
+            # Don't destroy the menu
+            if not isinstance(widget, tk.Menu):
+                widget.destroy()
 
     def check_authentication(self):
         self.clear_screen()
@@ -231,49 +269,15 @@ class SPGApp:
         main_frame = tk.Frame(self.root, bg="#FFFFFF", padx=15, pady=15)
         main_frame.pack(fill="both", expand=True)
 
-        # --- Bottom 3-Column Layout ---
-        bottom_container = tk.Frame(main_frame, bg="#FFFFFF")
-        bottom_container.pack(fill="x", side="bottom", pady=(10, 0))
-
-        # Column 1: System
-        system_frame = tk.LabelFrame(bottom_container, text=" ⚙️ System ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        system_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
-        ttk.Button(system_frame, text="📁 Open Config", style="Primary.TButton", command=lambda: open_config_folder(self.root)).pack(pady=(10, 5))
-        ttk.Button(system_frame, text="📍 File Locations", style="Primary.TButton", command=lambda: show_file_locations(self.root)).pack(pady=(0, 10))
-
-        # Column 2: Data Transfer
-        data_frame = tk.LabelFrame(bottom_container, text=" 🔄 Data Transfer ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
-        data_frame.pack(side="left", fill="both", expand=True, padx=5)
-        ttk.Button(data_frame, text="📤 Export", style="Success.TButton", command=lambda: show_export_dialog(self.root)).pack(pady=(10, 5))
-        ttk.Button(data_frame, text="📥 Import", style="Primary.TButton", command=lambda: show_import_dialog(self.root, self.after_import_callback)).pack(pady=(0, 10))
-
-        # Column 3: Delete Data
-        delete_frame = tk.LabelFrame(bottom_container, text=" 🗑️ Delete Data ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=COLOR_DANGER)
-        delete_frame.pack(side="left", fill="both", expand=True, padx=(5, 0))
-        
-        def _clear_vault_action():
-            if messagebox.askyesno("Confirm", "Permanently delete ALL saved passwords?", parent=self.root):
-                success, msg = clear_vault()
-                messagebox.showinfo("Vault", msg, parent=self.root)
-
-        ttk.Button(delete_frame, text="⚠️ Clear Vault", style="Danger.TButton", command=_clear_vault_action).pack(pady=(10, 5))
-        ttk.Button(delete_frame, text="🔥 Factory Reset", style="Danger.TButton", command=lambda: factory_reset(self.root, self.root.destroy)).pack(pady=(0, 10))
-
-        # --- Header ---
+        # Header (Simplified, no buttons)
         header_frame = tk.Frame(main_frame, bg="#FFFFFF")
         header_frame.pack(fill="x", pady=(0, 10))
-        header_frame.columnconfigure(1, weight=1) # Spacer to push buttons to the right
-        
-        tk.Label(header_frame, text="🔐 iBijan Pass", font=("Helvetica", 16, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").grid(row=0, column=0, sticky="w")
-        
-        header_btn_frame = tk.Frame(header_frame, bg="#FFFFFF")
-        header_btn_frame.grid(row=0, column=2, sticky="e")
-        ttk.Button(header_btn_frame, text="💡 About", style="Primary.TButton", command=lambda: show_about_dialog(self.root)).pack(side="left", padx=5)
-        ttk.Button(header_btn_frame, text="📚 Help Guide", style="Primary.TButton", command=lambda: show_comprehensive_help(self.root)).pack(side="left")
+        tk.Label(header_frame, text="🔐 iBijan Pass", font=("Helvetica", 16, "bold"), fg=BRAND_PRIMARY, bg="#FFFFFF").pack(side="left")
+        tk.Label(header_frame, text=f"v{APP_VERSION}", font=("Helvetica", 9), fg=COLOR_NEUTRAL, bg="#FFFFFF").pack(side="left", padx=10, pady=5)
 
-        # --- Notebook ---
+        # Notebook (Expands to fill the rest of the window)
         self.notebook = ttk.Notebook(main_frame)
-        self.notebook.pack(fill="both", expand=True, pady=(0, 10))
+        self.notebook.pack(fill="both", expand=True, pady=(0, 0))
 
         self.tab_mental = tk.Frame(self.notebook, bg="#FFFFFF")
         self.notebook.add(self.tab_mental, text=" 🧠 Mental Mode ")
@@ -290,7 +294,7 @@ class SPGApp:
             self.crypto_master_secret_entry.delete(0, tk.END)
 
     # ==========================================
-    # MENTAL MODE UI (Balanced Grid, Filled Space)
+    # MENTAL MODE UI
     # ==========================================
     def build_mental_mode_ui(self, parent):
         # --- Frame 1: Saved Patterns ---
@@ -308,11 +312,11 @@ class SPGApp:
         profile_btn_frame = tk.Frame(profile_frame, bg="#FFFFFF")
         profile_btn_frame.grid(row=0, column=2, padx=5, sticky="e")
         
-        btn_load = ttk.Button(profile_btn_frame, text="📥 Load Pattern", style="Primary.TButton", command=self.load_selected_profile)
+        btn_load = ttk.Button(profile_btn_frame, text="📥 Load", style="Primary.TButton", command=self.load_selected_profile)
         btn_load.pack(side="left", padx=2)
         ToolTip(btn_load, "Load the selected pattern to quickly generate a new password.")
 
-        ttk.Button(profile_btn_frame, text="🗑️ Delete Pattern", style="Danger.TButton", command=self.delete_selected_profile).pack(side="left", padx=2)
+        ttk.Button(profile_btn_frame, text="🗑️ Delete", style="Danger.TButton", command=self.delete_selected_profile).pack(side="left", padx=2)
 
         # --- Frame 2: Password Settings ---
         settings_frame = tk.LabelFrame(parent, text=" 🔧 Password Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
@@ -402,7 +406,7 @@ class SPGApp:
         tk.Label(tip_frame, text="Mental Mode relies on your personal pattern. Never share your formula or reuse the exact same prefix for high-security accounts (like banking) and casual accounts.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=650, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
 
     # ==========================================
-    # CRYPTOGRAPHIC MODE UI (Expanding Fields)
+    # CRYPTOGRAPHIC MODE UI
     # ==========================================
     def build_crypto_mode_ui(self, parent):
         top_frame = tk.Frame(parent, bg="#FFFFFF")
@@ -414,7 +418,7 @@ class SPGApp:
         service_frame = tk.LabelFrame(parent, text=" 🔐 Saved Services ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         service_frame.pack(fill="x", pady=(5, 5), padx=10)
         
-        service_frame.columnconfigure(1, weight=1) # Allow Combo to expand
+        service_frame.columnconfigure(1, weight=1)
 
         tk.Label(service_frame, text="Load Service:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=10, sticky="w")
         self.crypto_service_var = tk.StringVar()
@@ -429,7 +433,7 @@ class SPGApp:
         settings_frame = tk.LabelFrame(parent, text=" ⚙️ Generation Settings ", font=("Helvetica", 10, "bold"), bg="#FFFFFF", fg=BRAND_PRIMARY)
         settings_frame.pack(fill="x", pady=(0, 5), padx=10)
         
-        settings_frame.columnconfigure(1, weight=1) # Allow fields to expand
+        settings_frame.columnconfigure(1, weight=1)
 
         # Row 0: Master Secret
         tk.Label(settings_frame, text="Master Secret:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", padx=5, pady=5)
@@ -495,7 +499,6 @@ class SPGApp:
         
         tk.Label(tip_frame, text="🛡️ Security Note", font=("Helvetica", 11, "bold"), fg=BRAND_PRIMARY, bg="#E8ECFA").pack(anchor="w", padx=15, pady=(15, 5))
         tk.Label(tip_frame, text="Your Master Secret is mathematically used to generate these passwords. It is NEVER saved to disk. If you forget it, you will permanently lose access to all passwords in this mode.", font=("Helvetica", 10), fg="#333333", bg="#E8ECFA", wraplength=650, justify="left").pack(anchor="w", padx=15, pady=(0, 15))
-
 
     # ==========================================
     # LOGIC FUNCTIONS
