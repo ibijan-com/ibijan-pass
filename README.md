@@ -31,9 +31,34 @@ Unlike conventional password managers, iBijan Pass focuses primarily on **genera
 
 Mental Mode generates passwords using a repeatable personal pattern configured by you.
 
-- **Inputs:** A personal prefix, a base number, special characters, the service name, and optional capitalization.
+- **Inputs:** A personal prefix, a base number, special characters, the service name, and optional capitalization (up to three letters).
+- **Automatic calculation:** The program uses the length of the service name in two places: it adds that length to your base number to calculate the final numeric component, and it uses the service length as the beginning of the middle component. If you enter optional capitalization letters, they are appended to that middle component in uppercase.
 - **Benefits:** Provides a memorable approach to generating service-specific passwords without having to remember a completely different random password for every service.
 - **Security Considerations:** Mental Mode is designed for memorability and convenience, not as a replacement for cryptographically generated passwords. Its security depends on the secrecy and complexity of your personal pattern. If an attacker obtains multiple passwords generated from the same pattern, they may be able to reverse-engineer your formula.
+
+#### How the service-length calculation works
+
+You choose the prefix, base number, special characters, and optional capitalization. The service name is then used by the application to perform two automatic calculations:
+
+1. **Middle component:** The number of characters in the service name. If you provide optional capitalization letters, they are appended in uppercase.
+2. **Final numeric component:** Your base number plus the number of characters in the service name.
+
+For example, with a base number of `100` and the optional letter `K`:
+
+| Service name | Service length | Middle component | Calculated final number |
+|---|---:|---|---:|
+| `google` | 6 | `6K` | `106` |
+| `yahoo` | 5 | `5K` | `105` |
+
+The calculation can be summarized as:
+
+```text
+service_length = len(service_name)
+middle_component = str(service_length) + user_letter.upper()  # if provided
+final_number = base_number + service_length
+```
+
+If no optional capitalization letters are provided, the middle component contains only the service length. The final arrangement of these components depends on the selected password pattern in the application.
 
 ### 2. Cryptographic Mode
 
@@ -143,6 +168,12 @@ iBijan Pass provides a portable encrypted backup format (`.ibpass`) to help you 
 - **Master Secret Protection:** Anyone who obtains your Cryptographic Mode Master Secret and the corresponding service metadata may be able to regenerate your passwords.
 - **No Independent Security Audit:** iBijan Pass has not yet undergone an independent third-party security audit. Do not rely on it as the sole protection for high-value accounts without considering your own security requirements.
 - **Platform Support:** Official pre-built packages are currently available for Linux. Other platforms are planned for future releases.
+
+---
+
+## Frequently Asked Questions
+
+Have questions about iBijan Pass? Check the [FAQ](FAQ.md) for answers about Mental Mode, Cryptographic Mode, Master Secrets, backups, security, installation, and contributing to the project.
 
 ---
 
