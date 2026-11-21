@@ -1,6 +1,8 @@
 import os
 import json
 import base64
+import io
+import csv
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -83,8 +85,10 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         salt = base64.b64decode(file_payload["salt"])
         encrypted_data = file_payload["payload"].encode('utf-8')
         
-        # Read KDF param from file (fallback to 2**14 for older backups)
+        # Validate KDF parameter
         kdf_n = file_payload.get("kdf_n", 2**14)
+        if not isinstance(kdf_n, int) or kdf_n < 2**14 or kdf_n > 2**20:
+            return False, "Invalid KDF parameter in backup file."
         
         key = _derive_backup_key(password, salt, kdf_n)
         f = Fernet(key)
@@ -97,13 +101,13 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         
         imported_profiles = 0
         imported_crypto = 0
-        vault_restored = False # FIXED: Changed to boolean
+        vault_merged_count = 0
         
         profiles_to_write = None
         crypto_to_write = None
         vault_to_write = None
 
-        # 1. Prepare Data in Memory
+        # 1. Prepare Profiles (Keep Existing if Conflict)
         if "profiles" in import_payload["data"]:
             current_profiles = data_manager.get_profiles()
             merged = current_profiles.copy()
@@ -111,8 +115,11 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
                 if name not in merged:
                     merged[name] = data
                     imported_profiles += 1
+                # Note: If name exists, we currently keep the existing one. 
+                # (Conflict resolution UI will be added in Phase 2)
             profiles_to_write = get_fernet().encrypt(json.dumps(merged).encode())
 
+        # 2. Prepare Crypto Services (Keep Existing if Conflict)
         if "crypto_services" in import_payload["data"]:
             current_crypto = crypto_data_manager.get_services()
             merged_crypto = current_crypto.copy()
@@ -120,14 +127,52 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
                 if name not in merged_crypto:
                     merged_crypto[name] = data
                     imported_crypto += 1
+                # Note: If name exists, we keep the existing one.
+                # (Conflict resolution UI will be added in Phase 2)
             crypto_to_write = get_fernet().encrypt(json.dumps(merged_crypto).encode())
             
+        # 3. Prepare Vault (MERGE Logic - FIXED)
         if "vault_text" in import_payload["data"]:
-            vault_text = import_payload["data"]["vault_text"]
-            vault_to_write = get_fernet().encrypt(vault_text.encode())
-            vault_restored = True
+            # Parse existing vault
+            existing_vault_data = []
+            if os.path.exists(VAULT_FILE):
+                try:
+                    with open(VAULT_FILE, "rb") as vf:
+                        v_encrypted = vf.read()
+                    v_decrypted = get_fernet().decrypt(v_encrypted).decode()
+                    reader = csv.reader(io.StringIO(v_decrypted.strip()))
+                    next(reader, None) # Skip header
+                    for row in reader:
+                        if len(row) >= 2:
+                            existing_vault_data.append(tuple(row))
+                except Exception:
+                    pass # If vault is corrupted/empty, start fresh
+            
+            # Parse backup vault
+            backup_vault_data = []
+            reader = csv.reader(io.StringIO(import_payload["data"]["vault_text"].strip()))
+            next(reader, None) # Skip header
+            for row in reader:
+                if len(row) >= 2:
+                    backup_vault_data.append(tuple(row))
+            
+            # Merge based on (service, password)
+            merged_vault_data = existing_vault_data.copy()
+            existing_keys = [(r[0], r[1]) for r in existing_vault_data]
+            
+            for row in backup_vault_data:
+                if (row[0], row[1]) not in existing_keys:
+                    merged_vault_data.append(row)
+                    vault_merged_count += 1
+            
+            # Write merged vault to CSV
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["service", "password", "note"])
+            writer.writerows(merged_vault_data)
+            vault_to_write = get_fernet().encrypt(output.getvalue().encode())
 
-        # 2. Transactional Write
+        # 4. Transactional Write (With safer cleanup)
         paths = {
             "profiles": (PROFILES_FILE, profiles_to_write),
             "crypto": (CRYPTO_SERVICES_FILE, crypto_to_write),
@@ -139,7 +184,6 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
         existed_before = {} 
 
         try:
-            # Stage temp files
             for k, (dest, data_bytes) in paths.items():
                 existed_before[k] = os.path.exists(dest)
                 if data_bytes:
@@ -150,12 +194,10 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
                     temp_files[k] = temp_path
                     bak_files[k] = bak_path
 
-            # Backup existing
             for k, (dest, _) in paths.items():
                 if k in temp_files and existed_before[k]:
                     os.replace(dest, bak_files[k])
 
-            # Move temp to dest
             for k, temp_path in temp_files.items():
                 dest = paths[k][0]
                 os.replace(temp_path, dest)
@@ -183,15 +225,22 @@ def _import_data(file_path, password=None) -> tuple[bool, str]:
 
             return False, f"Import failed during write. Existing data was preserved.\nDetails: {e}"
         
-        vault_status = "Yes" if vault_restored else "No"
-        # FIXED: Updated success message to not show a fake count
-        return True, f"Import completed!\nProfiles restored: {imported_profiles}\nCrypto services restored: {imported_crypto}\nVault Data Restored: {vault_status}"
+        # 5. Accurate Summary Message
+        summary_lines = []
+        if imported_profiles > 0: summary_lines.append(f"{imported_profiles} new profiles added.")
+        if imported_crypto > 0: summary_lines.append(f"{imported_crypto} new crypto services added.")
+        if vault_merged_count > 0: summary_lines.append(f"{vault_merged_count} new passwords merged into Vault.")
+        
+        if not summary_lines:
+            return True, "Import completed. All data in the backup already exists in your database."
+            
+        return True, "Import completed successfully!\n\n" + "\n".join(summary_lines)
     
     except InvalidToken:
         return False, "Incorrect Password!\n\nThe password you entered does not match this backup file."
     except Exception as e:
         return False, f"Import failed: {str(e)}"
-
+    
 # ==========================================
 # UI Dialogs for Backup
 # ==========================================
