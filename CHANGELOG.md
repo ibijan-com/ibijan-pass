@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.1.12] - 2026-11-21
+
+### Fixed
+- **Critical Vault Import Bug:** Fixed a critical data loss bug where importing a backup would overwrite and delete newer passwords stored in the local Vault. The import process now safely **merges** incoming Vault entries with existing ones without data loss.
+- **Silent Import Conflicts:** Importing Profiles or Crypto Services with identical names but different settings no longer silently ignores the backup data. The application now detects these conflicts and prompts the user to either **Keep Existing** data or **Replace with Backup**.
+
+### Security & Reliability
+- **KDF Parameter Validation:** Added strict validation for the `kdf_n` parameter in imported backup files (restricting it to safe bounds). This prevents maliciously crafted backup files from causing memory exhaustion (Local DoS) during decryption.
+
 ## [v1.1.11] - 2026-11-19
 
 ### Changed
